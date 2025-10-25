@@ -327,24 +327,30 @@ class PhotosApp:
         if HAS_CALENDAR:
             self.carte_date_entry = DateEntry(self.carte_frame, textvariable=self.carte_date_var,
                                               date_pattern='yyyy-mm-dd', width=20)
-            self.carte_date_entry.grid(row=row, column=1, sticky=(tk.W, tk.E), padx=(5, 5), columnspan=2)
+            self.carte_date_entry.grid(row=row, column=1, sticky=(tk.W, tk.E), padx=(5, 5))
             self.carte_date_entry.bind('<<DateEntrySelected>>', self._on_date_selected)
         else:
             ttk.Entry(self.carte_frame, textvariable=self.carte_date_var).grid(
-                row=row, column=1, sticky=(tk.W, tk.E), padx=(5, 5), columnspan=2)
+                row=row, column=1, sticky=(tk.W, tk.E), padx=(5, 5))
+        ttk.Button(self.carte_frame, text="×", width=3,
+                   command=lambda: self.carte_date_var.set("")).grid(row=row, column=2, padx=(0, 5))
 
         # Plage horaire
         row += 1
         ttk.Label(self.carte_frame, text="Heure début (HH:MM:SS) :").grid(row=row, column=0, sticky=tk.W, pady=2)
         self.carte_start_time_var = tk.StringVar()
         ttk.Entry(self.carte_frame, textvariable=self.carte_start_time_var).grid(
-            row=row, column=1, sticky=(tk.W, tk.E), padx=(5, 5), columnspan=2)
+            row=row, column=1, sticky=(tk.W, tk.E), padx=(5, 5))
+        ttk.Button(self.carte_frame, text="×", width=3,
+                   command=lambda: self.carte_start_time_var.set("")).grid(row=row, column=2, padx=(0, 5))
 
         row += 1
         ttk.Label(self.carte_frame, text="Heure fin (HH:MM:SS) :").grid(row=row, column=0, sticky=tk.W, pady=2)
         self.carte_end_time_var = tk.StringVar()
         ttk.Entry(self.carte_frame, textvariable=self.carte_end_time_var).grid(
-            row=row, column=1, sticky=(tk.W, tk.E), padx=(5, 5), columnspan=2)
+            row=row, column=1, sticky=(tk.W, tk.E), padx=(5, 5))
+        ttk.Button(self.carte_frame, text="×", width=3,
+                   command=lambda: self.carte_end_time_var.set("")).grid(row=row, column=2, padx=(0, 5))
 
         # Villes
         row += 1
