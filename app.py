@@ -761,19 +761,8 @@ class PhotosApp:
         btn_frame = ttk.Frame(dialog)
         btn_frame.grid(row=2, column=0, columnspan=2, pady=10)
 
-        def on_ok():
-            name = name_var.get().strip()
-            if not name:
-                messagebox.showerror("Erreur", "Veuillez saisir un nom", parent=dialog)
-                return
-
-            # Vérifier qu'il n'y a pas déjà une action avec ce nom
-            for action in self.actions:
-                if action.name == name:
-                    messagebox.showerror("Erreur", f"Une configuration avec le nom '{name}' existe déjà", parent=dialog)
-                    return
-
-            # Créer la nouvelle action avec dirty=True et checked=True
+        def create_action(name: str) -> ActionConfig:
+            """Crée une nouvelle action avec les paramètres saisis"""
             action = ActionConfig(type_var.get(), name, dirty=True, checked=True)
 
             # Initialiser les champs de date avec la date mémorisée si disponible
@@ -783,25 +772,97 @@ class PhotosApp:
                 elif action.action_type == 'titreJour':
                     action.params['date'] = self.last_selected_date
 
+            return action
+
+        def validate_name() -> Optional[str]:
+            """Valide et retourne le nom saisi, ou None si invalide"""
+            name = name_var.get().strip()
+            if not name:
+                messagebox.showerror("Erreur", "Veuillez saisir un nom", parent=dialog)
+                return None
+
+            # Vérifier qu'il n'y a pas déjà une action avec ce nom
+            for action in self.actions:
+                if action.name == name:
+                    messagebox.showerror("Erreur", f"Une configuration avec le nom '{name}' existe déjà", parent=dialog)
+                    return None
+
+            return name
+
+        def select_new_action(index: int):
+            """Sélectionne l'action nouvellement créée"""
+            items = self.actions_tree.get_children()
+            if items and 0 <= index < len(items):
+                self.actions_tree.selection_set(items[index])
+                self._on_action_select(None)
+
+        def on_add_above():
+            """Ajoute la nouvelle action au-dessus de la sélection"""
+            name = validate_name()
+            if not name:
+                return
+
+            action = create_action(name)
+            current_index = self.actions.index(self.current_action)
+            self.actions.insert(current_index, action)
+            self.modified = True
+            self._refresh_actions_list()
+            dialog.destroy()
+            select_new_action(current_index)
+
+        def on_add_below():
+            """Ajoute la nouvelle action en dessous de la sélection"""
+            name = validate_name()
+            if not name:
+                return
+
+            action = create_action(name)
+            current_index = self.actions.index(self.current_action)
+            self.actions.insert(current_index + 1, action)
+            self.modified = True
+            self._refresh_actions_list()
+            dialog.destroy()
+            select_new_action(current_index + 1)
+
+        def on_add_end():
+            """Ajoute la nouvelle action à la fin"""
+            name = validate_name()
+            if not name:
+                return
+
+            action = create_action(name)
             self.actions.append(action)
             self.modified = True
             self._refresh_actions_list()
             dialog.destroy()
-
-            # Sélectionner la nouvelle action
-            items = self.actions_tree.get_children()
-            if items:
-                self.actions_tree.selection_set(items[-1])
-                self._on_action_select(None)
+            select_new_action(len(self.actions) - 1)
 
         def on_cancel():
             dialog.destroy()
 
-        ttk.Button(btn_frame, text="OK", command=on_ok).pack(side=tk.LEFT, padx=5)
-        ttk.Button(btn_frame, text="Annuler", command=on_cancel).pack(side=tk.LEFT, padx=5)
+        # Afficher les boutons en fonction de si une config est sélectionnée
+        if self.current_action is not None:
+            # Une config est sélectionnée : afficher les 3 boutons de position
+            btn_above = ttk.Button(btn_frame, text="Ajouter au-dessus", command=on_add_above)
+            btn_above.pack(side=tk.LEFT, padx=5)
 
-        # Enter pour valider
-        dialog.bind('<Return>', lambda e: on_ok())
+            btn_below = ttk.Button(btn_frame, text="Ajouter en dessous", command=on_add_below)
+            btn_below.pack(side=tk.LEFT, padx=5)
+
+            btn_end = ttk.Button(btn_frame, text="Ajouter à la fin", command=on_add_end)
+            btn_end.pack(side=tk.LEFT, padx=5)
+
+            ttk.Button(btn_frame, text="Annuler", command=on_cancel).pack(side=tk.LEFT, padx=5)
+
+            # Enter pour valider avec "Ajouter à la fin" (bouton par défaut)
+            dialog.bind('<Return>', lambda e: on_add_end())
+        else:
+            # Aucune config sélectionnée : afficher le bouton OK normal
+            ttk.Button(btn_frame, text="OK", command=on_add_end).pack(side=tk.LEFT, padx=5)
+            ttk.Button(btn_frame, text="Annuler", command=on_cancel).pack(side=tk.LEFT, padx=5)
+
+            # Enter pour valider
+            dialog.bind('<Return>', lambda e: on_add_end())
         dialog.bind('<Escape>', lambda e: on_cancel())
 
         # Centrer la fenêtre
