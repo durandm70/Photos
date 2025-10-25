@@ -21,6 +21,14 @@ except ImportError:
     HAS_DND = False
     print("⚠️ tkinterdnd2 non disponible - fonctionnalité drag & drop désactivée")
 
+# Import du calendrier
+try:
+    from tkcalendar import DateEntry
+    HAS_CALENDAR = True
+except ImportError:
+    HAS_CALENDAR = False
+    print("⚠️ tkcalendar non disponible - sélection de date par calendrier désactivée")
+
 # Import des modules locaux
 from photo_utils import ConfigManager, generate_map, parse_ville, generate_collage, generate_titre_jour
 
@@ -119,6 +127,9 @@ class PhotosApp:
 
         # Suivi des modifications
         self.modified: bool = False
+
+        # Date mémorisée pour initialiser les nouvelles configurations
+        self.last_selected_date: Optional[str] = None
 
         # Restaurer la géométrie de la fenêtre
         geometry = self.config_manager.get("window_geometry", "1200x800")
@@ -234,9 +245,9 @@ class PhotosApp:
                    command=self._add_action).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 2))
         ttk.Button(buttons_frame1, text="Supprimer",
                    command=self._delete_action).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=2)
-        ttk.Button(buttons_frame1, text="Haut",
+        ttk.Button(buttons_frame1, text="↑",
                    command=self._move_action_up).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=2)
-        ttk.Button(buttons_frame1, text="Bas",
+        ttk.Button(buttons_frame1, text="↓",
                    command=self._move_action_down).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(2, 0))
 
         # Boutons d'action - ligne 1.5
@@ -309,8 +320,14 @@ class PhotosApp:
         row += 1
         ttk.Label(self.carte_frame, text="Date (YYYY-MM-DD) :").grid(row=row, column=0, sticky=tk.W, pady=2)
         self.carte_date_var = tk.StringVar()
-        ttk.Entry(self.carte_frame, textvariable=self.carte_date_var).grid(
-            row=row, column=1, sticky=(tk.W, tk.E), padx=(5, 5), columnspan=2)
+        if HAS_CALENDAR:
+            self.carte_date_entry = DateEntry(self.carte_frame, textvariable=self.carte_date_var,
+                                              date_pattern='yyyy-mm-dd', width=20)
+            self.carte_date_entry.grid(row=row, column=1, sticky=(tk.W, tk.E), padx=(5, 5), columnspan=2)
+            self.carte_date_entry.bind('<<DateEntrySelected>>', self._on_date_selected)
+        else:
+            ttk.Entry(self.carte_frame, textvariable=self.carte_date_var).grid(
+                row=row, column=1, sticky=(tk.W, tk.E), padx=(5, 5), columnspan=2)
 
         # Plage horaire
         row += 1
@@ -381,7 +398,8 @@ class PhotosApp:
         btn_frame = ttk.Frame(self.collage_frame)
         btn_frame.grid(row=row, column=1, sticky=tk.W, padx=(5, 5), columnspan=2)
         ttk.Button(btn_frame, text="Ajouter", command=self._add_collage_images).pack(side=tk.LEFT, padx=(0, 5))
-        ttk.Button(btn_frame, text="Effacer", command=self._clear_collage_images).pack(side=tk.LEFT)
+        ttk.Button(btn_frame, text="Supprimer photo sélectionnée", command=self._delete_collage_image).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(btn_frame, text="Tout effacer", command=self._clear_collage_images).pack(side=tk.LEFT)
 
         # Liste des images
         row += 1
@@ -414,8 +432,14 @@ class PhotosApp:
         row += 1
         ttk.Label(self.titre_jour_frame, text="Date (YYYY-MM-DD) * :").grid(row=row, column=0, sticky=tk.W, pady=2)
         self.titre_jour_date_var = tk.StringVar()
-        ttk.Entry(self.titre_jour_frame, textvariable=self.titre_jour_date_var).grid(
-            row=row, column=1, sticky=(tk.W, tk.E), padx=(5, 5), columnspan=2)
+        if HAS_CALENDAR:
+            self.titre_jour_date_entry = DateEntry(self.titre_jour_frame, textvariable=self.titre_jour_date_var,
+                                                   date_pattern='yyyy-mm-dd', width=20)
+            self.titre_jour_date_entry.grid(row=row, column=1, sticky=(tk.W, tk.E), padx=(5, 5), columnspan=2)
+            self.titre_jour_date_entry.bind('<<DateEntrySelected>>', self._on_date_selected)
+        else:
+            ttk.Entry(self.titre_jour_frame, textvariable=self.titre_jour_date_var).grid(
+                row=row, column=1, sticky=(tk.W, tk.E), padx=(5, 5), columnspan=2)
 
         # Sélection des images
         row += 1
@@ -423,7 +447,8 @@ class PhotosApp:
         btn_frame = ttk.Frame(self.titre_jour_frame)
         btn_frame.grid(row=row, column=1, sticky=tk.W, padx=(5, 5), columnspan=2)
         ttk.Button(btn_frame, text="Ajouter", command=self._add_titre_jour_images).pack(side=tk.LEFT, padx=(0, 5))
-        ttk.Button(btn_frame, text="Effacer", command=self._clear_titre_jour_images).pack(side=tk.LEFT)
+        ttk.Button(btn_frame, text="Supprimer photo sélectionnée", command=self._delete_titre_jour_image).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(btn_frame, text="Tout effacer", command=self._clear_titre_jour_images).pack(side=tk.LEFT)
 
         # Liste des images
         row += 1
@@ -573,6 +598,9 @@ class PhotosApp:
                 self.current_file = filename
                 self.modified = False
 
+                # Charger la date mémorisée
+                self.last_selected_date = data.get('last_selected_date', None)
+
                 self._refresh_actions_list()
                 self._log(f"Fichier chargé : {filename}")
 
@@ -606,7 +634,8 @@ class PhotosApp:
         try:
             data = {
                 'version': 2,
-                'actions': [action.to_dict() for action in self.actions]
+                'actions': [action.to_dict() for action in self.actions],
+                'last_selected_date': self.last_selected_date
             }
 
             with open(filename, 'w', encoding='utf-8') as f:
@@ -746,6 +775,14 @@ class PhotosApp:
 
             # Créer la nouvelle action avec dirty=True et checked=True
             action = ActionConfig(type_var.get(), name, dirty=True, checked=True)
+
+            # Initialiser les champs de date avec la date mémorisée si disponible
+            if self.last_selected_date:
+                if action.action_type == 'carte':
+                    action.params['date'] = self.last_selected_date
+                elif action.action_type == 'titreJour':
+                    action.params['date'] = self.last_selected_date
+
             self.actions.append(action)
             self.modified = True
             self._refresh_actions_list()
@@ -1185,6 +1222,14 @@ class PhotosApp:
         """Efface les images du collage"""
         self.collage_images_listbox.delete(0, tk.END)
 
+    def _delete_collage_image(self):
+        """Supprime l'image sélectionnée du collage"""
+        selection = self.collage_images_listbox.curselection()
+        if selection:
+            self.collage_images_listbox.delete(selection[0])
+        else:
+            messagebox.showwarning("Attention", "Veuillez sélectionner une image à supprimer")
+
     def _add_titre_jour_images(self):
         """Ajoute des images au titre du jour"""
         initial_dir = os.path.dirname(self.current_file) if self.current_file else os.getcwd()
@@ -1203,6 +1248,14 @@ class PhotosApp:
     def _clear_titre_jour_images(self):
         """Efface les images du titre du jour"""
         self.titre_jour_images_listbox.delete(0, tk.END)
+
+    def _delete_titre_jour_image(self):
+        """Supprime l'image sélectionnée du titre du jour"""
+        selection = self.titre_jour_images_listbox.curselection()
+        if selection:
+            self.titre_jour_images_listbox.delete(selection[0])
+        else:
+            messagebox.showwarning("Attention", "Veuillez sélectionner une image à supprimer")
 
     # ========== Parcourir les fichiers ==========
 
@@ -1238,6 +1291,14 @@ class PhotosApp:
         )
         if filename:
             self.collage_ref_image_var.set(filename)
+
+    def _on_date_selected(self, event):
+        """Appelé quand une date est sélectionnée dans un calendrier"""
+        # Récupérer la date sélectionnée (au format YYYY-MM-DD)
+        date_str = event.widget.get()
+        if date_str:
+            self.last_selected_date = date_str
+            self._log(f"📅 Date mémorisée : {date_str}")
 
     # ========== Génération ==========
 
