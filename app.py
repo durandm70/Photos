@@ -31,7 +31,7 @@ APP_VERSION = "1.0.0"
 class ActionConfig:
     """Représente une configuration d'action (carte, collage ou titreJour)"""
 
-    def __init__(self, action_type: str, name: str, params: Optional[Dict[str, Any]] = None, dirty: bool = False):
+    def __init__(self, action_type: str, name: str, params: Optional[Dict[str, Any]] = None, dirty: bool = False, checked: bool = False):
         """
         Initialise une configuration d'action
 
@@ -40,11 +40,13 @@ class ActionConfig:
             name: Nom de l'action (nom du fichier de sortie)
             params: Paramètres de configuration spécifiques au type
             dirty: Indique si la configuration a été modifiée depuis la dernière génération
+            checked: Indique si la configuration est cochée pour génération
         """
         self.action_type = action_type
         self.name = name
         self.params = params or self._get_default_params(action_type)
         self.dirty = dirty
+        self.checked = checked
 
     def _get_default_params(self, action_type: str) -> Dict[str, Any]:
         """Retourne les paramètres par défaut selon le type d'action"""
@@ -79,7 +81,8 @@ class ActionConfig:
             'type': self.action_type,
             'name': self.name,
             'params': self.params,
-            'dirty': self.dirty
+            'dirty': self.dirty,
+            'checked': self.checked
         }
 
     @staticmethod
@@ -89,7 +92,8 @@ class ActionConfig:
             action_type=data['type'],
             name=data['name'],
             params=data.get('params', {}),
-            dirty=data.get('dirty', False)
+            dirty=data.get('dirty', False),
+            checked=data.get('checked', False)
         )
 
 
@@ -186,17 +190,29 @@ class PhotosApp:
         list_label = ttk.Label(top_frame, text="Configurations :")
         list_label.pack(anchor=tk.W, pady=(0, 5))
 
+        # Checkbox master pour tout cocher/décocher
+        self.master_check_var = tk.BooleanVar(value=False)
+        self.master_checkbox = ttk.Checkbutton(
+            top_frame,
+            text="Tout cocher/décocher",
+            variable=self.master_check_var,
+            command=self._toggle_all_checks
+        )
+        self.master_checkbox.pack(anchor=tk.W, pady=(0, 5))
+
         # Frame pour la liste avec scrollbar
         list_container = ttk.Frame(top_frame)
         list_container.pack(fill=tk.BOTH, expand=True)
 
         # Créer un Treeview pour afficher les configurations
-        self.actions_tree = ttk.Treeview(list_container, columns=('name',),
+        self.actions_tree = ttk.Treeview(list_container, columns=('check', 'name'),
                                          show='tree headings', selectmode='browse')
         self.actions_tree.heading('#0', text='Type')
+        self.actions_tree.heading('check', text='☐')
         self.actions_tree.heading('name', text='Nom')
         self.actions_tree.column('#0', width=80)
-        self.actions_tree.column('name', width=200)
+        self.actions_tree.column('check', width=30, anchor='center')
+        self.actions_tree.column('name', width=170)
 
         scrollbar = ttk.Scrollbar(list_container, orient=tk.VERTICAL,
                                   command=self.actions_tree.yview)
@@ -207,6 +223,8 @@ class PhotosApp:
 
         # Bind selection
         self.actions_tree.bind('<<TreeviewSelect>>', self._on_action_select)
+        # Bind clic pour toggle checkbox
+        self.actions_tree.bind('<Button-1>', self._on_tree_click)
 
         # Boutons d'action - ligne 1
         buttons_frame1 = ttk.Frame(top_frame)
@@ -231,8 +249,8 @@ class PhotosApp:
                    command=self._duplicate_action).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(2, 0))
 
         # Bouton génération - ligne 2
-        ttk.Button(top_frame, text="Générer l'image",
-                   command=self._generate_image).pack(fill=tk.X, pady=(0, 0))
+        ttk.Button(top_frame, text="Générer les images cochées",
+                   command=self._generate_images).pack(fill=tk.X, pady=(0, 0))
 
         # Zone inférieure : logs
         log_frame = ttk.Frame(left_paned)
@@ -632,8 +650,10 @@ class PhotosApp:
             type_label = self._get_action_type_label(action.action_type)
             # Ajouter "*" avant le nom si la configuration est dirty
             display_name = f"* {action.name}" if action.dirty else action.name
+            # Afficher ☑ si coché, ☐ sinon
+            check_symbol = '☑' if action.checked else '☐'
             self.actions_tree.insert('', 'end', text=type_label,
-                                    values=(display_name,), tags=(action.action_type,))
+                                    values=(check_symbol, display_name), tags=(action.action_type,))
 
         # Restaurer la sélection si nécessaire
         if keep_selection and selected_index is not None:
@@ -649,6 +669,36 @@ class PhotosApp:
             'titreJour': 'Titre jour'
         }
         return labels.get(action_type, 'Inconnu')
+
+    def _toggle_all_checks(self):
+        """Coche/décoche toutes les configurations"""
+        check_all = self.master_check_var.get()
+        for action in self.actions:
+            action.checked = check_all
+        self.modified = True
+        self._refresh_actions_list(keep_selection=True)
+
+    def _on_tree_click(self, event):
+        """Gère le clic sur le Treeview pour toggler les checkboxes"""
+        # Identifier la région cliquée
+        region = self.actions_tree.identify_region(event.x, event.y)
+        if region != "cell":
+            return
+
+        # Identifier la colonne
+        column = self.actions_tree.identify_column(event.x)
+
+        # Si c'est la colonne checkbox (colonne #1)
+        if column == '#1':
+            # Identifier l'item cliqué
+            item = self.actions_tree.identify_row(event.y)
+            if item:
+                # Récupérer l'index de l'action
+                index = self.actions_tree.index(item)
+                # Toggler le checkbox
+                self.actions[index].checked = not self.actions[index].checked
+                self.modified = True
+                self._refresh_actions_list(keep_selection=True)
 
     def _add_action(self):
         """Ajoute une nouvelle action"""
@@ -689,8 +739,8 @@ class PhotosApp:
                     messagebox.showerror("Erreur", f"Une configuration avec le nom '{name}' existe déjà", parent=dialog)
                     return
 
-            # Créer la nouvelle action avec dirty=True
-            action = ActionConfig(type_var.get(), name, dirty=True)
+            # Créer la nouvelle action avec dirty=True et checked=True
+            action = ActionConfig(type_var.get(), name, dirty=True, checked=True)
             self.actions.append(action)
             self.modified = True
             self._refresh_actions_list()
@@ -947,7 +997,8 @@ class PhotosApp:
                 action_type=action.action_type,
                 name=new_name,
                 params=copy.deepcopy(action.params),
-                dirty=True
+                dirty=True,
+                checked=True
             )
 
             # Ajouter la nouvelle action juste après l'action dupliquée
@@ -1069,6 +1120,9 @@ class PhotosApp:
         # Marquer comme dirty si les paramètres ont changé
         if old_params != self.current_action.params:
             self.current_action.dirty = True
+            # Cocher automatiquement la configuration quand elle devient dirty
+            if not old_dirty:  # Si elle n'était pas dirty avant
+                self.current_action.checked = True
 
             # Rafraîchir la liste si le statut dirty a changé, sans désélectionner
             if old_dirty != self.current_action.dirty:
@@ -1171,12 +1225,8 @@ class PhotosApp:
 
     # ========== Génération ==========
 
-    def _generate_image(self):
-        """Génère l'image pour l'action sélectionnée"""
-        if self.current_action is None:
-            messagebox.showwarning("Attention", "Veuillez sélectionner une action")
-            return
-
+    def _generate_images(self):
+        """Génère les images pour toutes les actions cochées"""
         # Vérifier que le fichier est sauvegardé
         if not self.current_file:
             messagebox.showerror("Erreur", "Veuillez d'abord sauvegarder le fichier de configuration")
@@ -1185,33 +1235,50 @@ class PhotosApp:
         # Sauvegarder les paramètres actuels
         self._save_current_action()
 
-        # Lancer la génération selon le type
-        if self.current_action.action_type == 'carte':
-            self._generate_carte()
-        elif self.current_action.action_type == 'collage':
-            self._generate_collage()
-        elif self.current_action.action_type == 'titreJour':
-            self._generate_titre_jour()
+        # Récupérer toutes les actions cochées
+        checked_actions = [action for action in self.actions if action.checked]
 
-    def _generate_carte(self):
+        if not checked_actions:
+            messagebox.showwarning("Attention", "Aucune configuration n'est cochée")
+            return
+
+        self._log(f"=== Génération de {len(checked_actions)} image(s) cochée(s) ===")
+
+        # Générer chaque action cochée
+        for action in checked_actions:
+            self._generate_single_action(action)
+
+        self._log("=== Génération terminée pour toutes les images cochées ===")
+
+    def _generate_single_action(self, action: ActionConfig):
+        """Génère l'image pour une action donnée"""
+        # Lancer la génération selon le type
+        if action.action_type == 'carte':
+            self._generate_carte(action)
+        elif action.action_type == 'collage':
+            self._generate_collage(action)
+        elif action.action_type == 'titreJour':
+            self._generate_titre_jour(action)
+
+    def _generate_carte(self, action: ActionConfig):
         """Génère une carte"""
-        params = self.current_action.params
+        params = action.params
 
         # Vérifier les champs obligatoires
         if not params.get('gpx_file'):
-            messagebox.showerror("Erreur", "Veuillez sélectionner un fichier GPX")
+            self._log(f"❌ Erreur pour '{action.name}': Veuillez sélectionner un fichier GPX")
             return
 
         # Lancer la génération dans un thread
-        thread = threading.Thread(target=self._generate_carte_thread)
+        thread = threading.Thread(target=self._generate_carte_thread, args=(action,))
         thread.start()
 
-    def _generate_carte_thread(self):
+    def _generate_carte_thread(self, action: ActionConfig):
         """Génère la carte (exécuté dans un thread)"""
         try:
-            self._log(f"🚀 Génération de la carte '{self.current_action.name}'...")
+            self._log(f"🚀 Génération de la carte '{action.name}'...")
 
-            params = self.current_action.params
+            params = action.params
 
             # Récupérer les paramètres
             gpx_file = params.get('gpx_file')
@@ -1277,43 +1344,42 @@ class PhotosApp:
             # Générer la carte
             generate_map(
                 gpx_file, start_time, end_time, city_list,
-                self.current_action.name, ref_image, marge, titre,
+                action.name, ref_image, marge, titre,
                 log_callback=self._log
             )
 
             # Marquer la configuration comme non-dirty après génération réussie
-            self.current_action.dirty = False
+            action.dirty = False
             self.root.after(0, self._refresh_actions_list)
 
-            self._log("✅ Génération terminée avec succès !")
+            self._log(f"✅ Génération de '{action.name}' terminée avec succès !")
 
         except Exception as e:
-            self._log(f"❌ Erreur : {str(e)}")
-            messagebox.showerror("Erreur", f"Erreur lors de la génération : {str(e)}")
+            self._log(f"❌ Erreur pour '{action.name}': {str(e)}")
 
-    def _generate_collage(self):
+    def _generate_collage(self, action: ActionConfig):
         """Génère un collage"""
-        params = self.current_action.params
+        params = action.params
         images = params.get('images', [])
 
         # Vérifier qu'il y a des images
         if len(images) < 2:
-            messagebox.showerror("Erreur", "Veuillez sélectionner au moins 2 images")
+            self._log(f"❌ Erreur pour '{action.name}': Veuillez sélectionner au moins 2 images")
             return
         if len(images) > 7:
-            messagebox.showerror("Erreur", "Maximum 7 images autorisées")
+            self._log(f"❌ Erreur pour '{action.name}': Maximum 7 images autorisées")
             return
 
         # Lancer la génération dans un thread
-        thread = threading.Thread(target=self._generate_collage_thread)
+        thread = threading.Thread(target=self._generate_collage_thread, args=(action,))
         thread.start()
 
-    def _generate_collage_thread(self):
+    def _generate_collage_thread(self, action: ActionConfig):
         """Génère le collage (exécuté dans un thread)"""
         try:
-            self._log(f"🚀 Génération du collage '{self.current_action.name}'...")
+            self._log(f"🚀 Génération du collage '{action.name}'...")
 
-            params = self.current_action.params
+            params = action.params
 
             # Récupérer les paramètres
             title = params.get('title') or None
@@ -1330,49 +1396,48 @@ class PhotosApp:
                 images,
                 title=title,
                 date_str=date_str,
-                output_name=self.current_action.name,
+                output_name=action.name,
                 log_callback=self._log
             )
 
             # Marquer la configuration comme non-dirty après génération réussie
-            self.current_action.dirty = False
+            action.dirty = False
             self.root.after(0, self._refresh_actions_list)
 
             self._log(f"✅ Collage généré : {output_file}")
 
         except Exception as e:
-            self._log(f"❌ Erreur : {str(e)}")
-            messagebox.showerror("Erreur", f"Erreur lors de la génération : {str(e)}")
+            self._log(f"❌ Erreur pour '{action.name}': {str(e)}")
 
-    def _generate_titre_jour(self):
+    def _generate_titre_jour(self, action: ActionConfig):
         """Génère un titre du jour"""
-        params = self.current_action.params
+        params = action.params
         images = params.get('images', [])
 
         # Vérifier les champs obligatoires
         if not params.get('title'):
-            messagebox.showerror("Erreur", "Veuillez saisir un titre")
+            self._log(f"❌ Erreur pour '{action.name}': Veuillez saisir un titre")
             return
         if not params.get('date'):
-            messagebox.showerror("Erreur", "Veuillez saisir une date")
+            self._log(f"❌ Erreur pour '{action.name}': Veuillez saisir une date")
             return
         if len(images) < 2:
-            messagebox.showerror("Erreur", "Veuillez sélectionner au moins 2 images")
+            self._log(f"❌ Erreur pour '{action.name}': Veuillez sélectionner au moins 2 images")
             return
         if len(images) > 7:
-            messagebox.showerror("Erreur", "Maximum 7 images autorisées")
+            self._log(f"❌ Erreur pour '{action.name}': Maximum 7 images autorisées")
             return
 
         # Lancer la génération dans un thread
-        thread = threading.Thread(target=self._generate_titre_jour_thread)
+        thread = threading.Thread(target=self._generate_titre_jour_thread, args=(action,))
         thread.start()
 
-    def _generate_titre_jour_thread(self):
+    def _generate_titre_jour_thread(self, action: ActionConfig):
         """Génère le titre du jour (exécuté dans un thread)"""
         try:
-            self._log(f"🚀 Génération du titre du jour '{self.current_action.name}'...")
+            self._log(f"🚀 Génération du titre du jour '{action.name}'...")
 
-            params = self.current_action.params
+            params = action.params
 
             # Récupérer les paramètres
             title = params.get('title')
@@ -1395,19 +1460,18 @@ class PhotosApp:
                 images,
                 date_str=date_str,
                 title=title,
-                output_name=self.current_action.name,
+                output_name=action.name,
                 log_callback=self._log
             )
 
             # Marquer la configuration comme non-dirty après génération réussie
-            self.current_action.dirty = False
+            action.dirty = False
             self.root.after(0, self._refresh_actions_list)
 
             self._log(f"✅ Titre du jour généré : {output_file}")
 
         except Exception as e:
-            self._log(f"❌ Erreur : {str(e)}")
-            messagebox.showerror("Erreur", f"Erreur lors de la génération : {str(e)}")
+            self._log(f"❌ Erreur pour '{action.name}': {str(e)}")
 
     # ========== Logs ==========
 
