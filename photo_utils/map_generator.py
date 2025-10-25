@@ -345,7 +345,10 @@ def generate_map(gpx_file, start_time, end_time, city_list, output_filename,
                         points.append((p.longitude, p.latitude))
 
     if len(points) < 2:
-        raise ValueError(f"Pas assez de points entre {start_time} et {end_time} pour générer une trace.")
+        if start_time is None or end_time is None:
+            raise ValueError(f"Pas assez de points dans le fichier GPX pour générer une trace.")
+        else:
+            raise ValueError(f"Pas assez de points entre {start_time} et {end_time} pour générer une trace.")
     log(f"✅ {len(points)} points trouvés", log_callback)
 
     line = LineString(points)
