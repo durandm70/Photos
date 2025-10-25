@@ -17,6 +17,9 @@ requests>=2.31.0
 # Calculs numériques
 numpy>=1.24.0
 
+# Interface utilisateur - Drag & Drop
+tkinterdnd2>=0.3.0
+
 # Support des fuseaux horaires (intégré à Python 3.9+)
 # Si Python < 3.9, décommenter la ligne suivante :
 # backports.zoneinfo>=0.2.1
