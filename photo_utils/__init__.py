@@ -6,10 +6,12 @@ Contient les modules pour la génération de cartes et de collages
 from .config_manager import ConfigManager
 from .map_generator import generate_map, parse_ville
 from .collage_generator import generate_collage
+from .titreJour_generator import generate_titre_jour
 
 __all__ = [
     'ConfigManager',
     'generate_map',
     'parse_ville',
-    'generate_collage'
+    'generate_collage',
+    'generate_titre_jour'
 ]

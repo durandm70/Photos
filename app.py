@@ -11,7 +11,7 @@ from zoneinfo import ZoneInfo
 import threading
 
 # Import des modules locaux
-from photo_utils import ConfigManager, generate_map, parse_ville, generate_collage
+from photo_utils import ConfigManager, generate_map, parse_ville, generate_collage, generate_titre_jour
 
 
 class PhotosApp:
@@ -62,6 +62,9 @@ class PhotosApp:
 
         # Onglet 2 : Génération de collage
         self._create_collage_tab()
+
+        # Onglet 3 : Génération de titre du jour
+        self._create_titre_jour_tab()
 
     def _create_target_folder_section(self, parent):
         """Crée la section de sélection du dossier cible"""
@@ -241,6 +244,73 @@ class PhotosApp:
         self.collage_log_text = scrolledtext.ScrolledText(collage_frame, height=10, width=80)
         self.collage_log_text.grid(row=row+1, column=0, columnspan=3, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(0, 5))
 
+    def _create_titre_jour_tab(self):
+        """Crée l'onglet de génération de titre du jour"""
+        titre_frame = ttk.Frame(self.notebook, padding="10")
+        self.notebook.add(titre_frame, text="Titre du jour")
+
+        # Configuration du redimensionnement
+        titre_frame.columnconfigure(1, weight=1)
+        titre_frame.rowconfigure(10, weight=1)
+
+        # Titre (obligatoire)
+        row = 0
+        ttk.Label(titre_frame, text="Titre * :").grid(row=row, column=0, sticky=tk.W, pady=2)
+        self.titre_jour_title_var = tk.StringVar()
+        ttk.Entry(titre_frame, textvariable=self.titre_jour_title_var).grid(
+            row=row, column=1, sticky=(tk.W, tk.E), padx=(5, 5), columnspan=2)
+
+        # Date (obligatoire)
+        row += 1
+        ttk.Label(titre_frame, text="Date (YYYY-MM-DD) * :").grid(row=row, column=0, sticky=tk.W, pady=2)
+        self.titre_jour_date_var = tk.StringVar()
+        ttk.Entry(titre_frame, textvariable=self.titre_jour_date_var).grid(
+            row=row, column=1, sticky=(tk.W, tk.E), padx=(5, 5), columnspan=2)
+
+        # Nom de sortie
+        row += 1
+        ttk.Label(titre_frame, text="Nom de sortie :").grid(row=row, column=0, sticky=tk.W, pady=2)
+        self.titre_jour_output_var = tk.StringVar()
+        ttk.Entry(titre_frame, textvariable=self.titre_jour_output_var).grid(
+            row=row, column=1, sticky=(tk.W, tk.E), padx=(5, 5), columnspan=2)
+        ttk.Label(titre_frame, text="(optionnel, utilise la date par défaut)",
+                  font=('TkDefaultFont', 8)).grid(row=row+1, column=1, sticky=tk.W, padx=(5, 0))
+
+        # Sélection des images
+        row += 2
+        ttk.Label(titre_frame, text="Images sélectionnées :").grid(row=row, column=0, sticky=tk.W, pady=2)
+        ttk.Button(titre_frame, text="Ajouter des images", command=self._add_titre_jour_images).grid(
+            row=row, column=1, sticky=tk.W, padx=(5, 5))
+        ttk.Button(titre_frame, text="Effacer la sélection", command=self._clear_titre_jour_images).grid(
+            row=row, column=2, sticky=tk.W)
+
+        # Liste des images
+        row += 1
+        list_frame = ttk.Frame(titre_frame)
+        list_frame.grid(row=row, column=0, columnspan=3, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(5, 10))
+        list_frame.columnconfigure(0, weight=1)
+        list_frame.rowconfigure(0, weight=1)
+
+        self.titre_jour_images_listbox = tk.Listbox(list_frame, height=10)
+        self.titre_jour_images_listbox.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+
+        scrollbar = ttk.Scrollbar(list_frame, orient=tk.VERTICAL, command=self.titre_jour_images_listbox.yview)
+        scrollbar.grid(row=0, column=1, sticky=(tk.N, tk.S))
+        self.titre_jour_images_listbox.configure(yscrollcommand=scrollbar.set)
+
+        self.titre_jour_images = []
+
+        # Bouton de génération
+        row += 1
+        ttk.Button(titre_frame, text="Générer le titre du jour", command=self._generate_titre_jour).grid(
+            row=row, column=0, columnspan=3, pady=(10, 5))
+
+        # Zone de log
+        row += 1
+        ttk.Label(titre_frame, text="Logs :").grid(row=row, column=0, sticky=tk.W, pady=(5, 2))
+        self.titre_jour_log_text = scrolledtext.ScrolledText(titre_frame, height=10, width=80)
+        self.titre_jour_log_text.grid(row=row+1, column=0, columnspan=3, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(0, 5))
+
     def _browse_target_folder(self):
         """Ouvre un dialogue pour sélectionner le dossier cible"""
         folder = filedialog.askdirectory(
@@ -288,6 +358,23 @@ class PhotosApp:
         self.collage_images = []
         self.collage_images_listbox.delete(0, tk.END)
 
+    def _add_titre_jour_images(self):
+        """Ajoute des images à la liste du titre du jour"""
+        filenames = filedialog.askopenfilenames(
+            title="Sélectionner les images",
+            initialdir=self.target_folder_var.get(),
+            filetypes=[("Images", "*.jpg *.jpeg *.png"), ("Tous les fichiers", "*.*")]
+        )
+        for filename in filenames:
+            if filename not in self.titre_jour_images:
+                self.titre_jour_images.append(filename)
+                self.titre_jour_images_listbox.insert(tk.END, os.path.basename(filename))
+
+    def _clear_titre_jour_images(self):
+        """Efface la sélection d'images du titre du jour"""
+        self.titre_jour_images = []
+        self.titre_jour_images_listbox.delete(0, tk.END)
+
     def _log_map(self, message):
         """Ajoute un message au log de la carte"""
         self.map_log_text.insert(tk.END, message + "\n")
@@ -298,6 +385,12 @@ class PhotosApp:
         """Ajoute un message au log du collage"""
         self.collage_log_text.insert(tk.END, message + "\n")
         self.collage_log_text.see(tk.END)
+        self.root.update_idletasks()
+
+    def _log_titre_jour(self, message):
+        """Ajoute un message au log du titre du jour"""
+        self.titre_jour_log_text.insert(tk.END, message + "\n")
+        self.titre_jour_log_text.see(tk.END)
         self.root.update_idletasks()
 
     def _generate_map(self):
@@ -455,6 +548,75 @@ class PhotosApp:
 
         except Exception as e:
             self._log_collage(f"❌ Erreur : {str(e)}")
+            messagebox.showerror("Erreur", f"Erreur lors de la génération : {str(e)}")
+
+        finally:
+            # Réactiver les boutons
+            for widget in self.notebook.winfo_children():
+                for child in widget.winfo_children():
+                    if isinstance(child, ttk.Button):
+                        child.configure(state='normal')
+
+    def _generate_titre_jour(self):
+        """Lance la génération du titre du jour dans un thread séparé"""
+        # Vérifier les champs obligatoires
+        if not self.titre_jour_title_var.get():
+            messagebox.showerror("Erreur", "Veuillez saisir un titre")
+            return
+        if not self.titre_jour_date_var.get():
+            messagebox.showerror("Erreur", "Veuillez saisir une date")
+            return
+        if len(self.titre_jour_images) < 2:
+            messagebox.showerror("Erreur", "Veuillez sélectionner au moins 2 images")
+            return
+        if len(self.titre_jour_images) > 7:
+            messagebox.showerror("Erreur", "Maximum 7 images autorisées")
+            return
+
+        # Désactiver le bouton pendant la génération
+        for widget in self.notebook.winfo_children():
+            for child in widget.winfo_children():
+                if isinstance(child, ttk.Button):
+                    child.configure(state='disabled')
+
+        # Lancer la génération dans un thread
+        thread = threading.Thread(target=self._generate_titre_jour_thread)
+        thread.start()
+
+    def _generate_titre_jour_thread(self):
+        """Génère le titre du jour (exécuté dans un thread)"""
+        try:
+            self._log_titre_jour("🚀 Démarrage de la génération du titre du jour...")
+
+            # Récupérer les paramètres
+            title = self.titre_jour_title_var.get()
+            date_str = self.titre_jour_date_var.get()
+            output_name = self.titre_jour_output_var.get() or None
+
+            # Valider le format de date
+            try:
+                datetime.strptime(date_str, "%Y-%m-%d")
+            except ValueError:
+                raise ValueError("Le format de date doit être YYYY-MM-DD")
+
+            # Changer vers le dossier cible
+            target_folder = self.target_folder_var.get()
+            if target_folder:
+                os.chdir(target_folder)
+
+            # Générer le titre du jour
+            output_file = generate_titre_jour(
+                self.titre_jour_images,
+                date_str=date_str,
+                title=title,
+                output_name=output_name,
+                log_callback=self._log_titre_jour
+            )
+
+            self._log_titre_jour(f"✅ Titre du jour généré : {output_file}")
+
+        except Exception as e:
+            self._log_titre_jour(f"❌ Erreur : {str(e)}")
             messagebox.showerror("Erreur", f"Erreur lors de la génération : {str(e)}")
 
         finally:
