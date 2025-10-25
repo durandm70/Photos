@@ -1,21 +1,50 @@
-# Photos
+# Photos Manager
 
-## Hello Application
+Application GUI unifiée pour la gestion de photos avec génération de cartes et collages.
 
-Simple Python GUI application that displays "hello" in a window.
+## Fonctionnalités principales
 
-### Requirements
+- **Génération de cartes depuis fichiers GPX** : Créez des cartes visuelles à partir de vos traces GPS
+- **Génération de collages photos** : Créez des collages artistiques avec 2 à 7 photos
+- **Interface graphique intuitive** : Application tkinter facile à utiliser
+- **Gestion des métadonnées EXIF** : Application automatique de dates et notations
 
-- Python 3.x
-- tkinter (included with most Python installations)
+## Installation rapide
 
-### How to Run
+1. **Clonez le dépôt** (ou téléchargez le code)
+
+2. **Installez les dépendances** :
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+3. **Lancez l'application** :
+   ```bash
+   python app.py
+   ```
+
+## Documentation complète
+
+Pour plus de détails sur l'utilisation, la configuration et le dépannage, consultez [README_APP.md](README_APP.md).
+
+## Dépannage rapide
+
+Si vous obtenez une erreur `ModuleNotFoundError: No module named 'matplotlib'` (ou autre module), vous devez installer les dépendances :
 
 ```bash
-python3 hello_app.py
+pip install -r requirements.txt
 ```
 
-### Features
+Sur Windows, vous devrez peut-être utiliser :
+```bash
+python -m pip install -r requirements.txt
+```
 
-- Displays "hello" text in a graphical window
-- Clean and simple tkinter-based interface
+## Prérequis
+
+- Python 3.9 ou supérieur
+- pip (gestionnaire de paquets Python)
+
+## Licence
+
+Ce projet est dérivé des scripts originaux `GenererCarte.py` et `collage.py`.

@@ -26,7 +26,41 @@ Application GUI unifiée pour la gestion de photos avec génération de cartes e
 
 ### Installation des dépendances
 
+#### Sur Windows
+
+Ouvrez PowerShell ou l'Invite de commandes dans le dossier du projet et exécutez :
+
 ```bash
+pip install -r requirements.txt
+```
+
+Si vous utilisez plusieurs versions de Python, utilisez :
+
+```bash
+python -m pip install -r requirements.txt
+```
+
+#### Sur Linux/Mac
+
+```bash
+pip3 install -r requirements.txt
+```
+
+#### Recommandation : Utiliser un environnement virtuel
+
+Il est recommandé d'utiliser un environnement virtuel pour isoler les dépendances :
+
+**Windows :**
+```bash
+python -m venv venv
+venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+**Linux/Mac :**
+```bash
+python3 -m venv venv
+source venv/bin/activate
 pip install -r requirements.txt
 ```
 
@@ -99,6 +133,35 @@ Les paramètres sauvegardés incluent :
 Les fonds de carte téléchargés sont mis en cache dans le dossier `__cache` pour accélérer les générations futures.
 
 ## Dépannage
+
+### ModuleNotFoundError: No module named 'matplotlib' (ou autre module)
+
+Cette erreur indique que les dépendances Python ne sont pas installées. Pour résoudre ce problème :
+
+1. **Vérifiez que vous avez installé les dépendances** :
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+2. **Si vous utilisez plusieurs versions de Python** :
+   ```bash
+   python -m pip install -r requirements.txt
+   ```
+
+3. **Si vous utilisez un environnement virtuel**, assurez-vous qu'il est activé :
+   - Windows : `venv\Scripts\activate`
+   - Linux/Mac : `source venv/bin/activate`
+
+4. **Vérifiez la version de Python** (minimum requis : Python 3.9) :
+   ```bash
+   python --version
+   ```
+
+5. **Réinstallez les dépendances si nécessaire** :
+   ```bash
+   pip uninstall -r requirements.txt -y
+   pip install -r requirements.txt
+   ```
 
 ### Erreur de police "ARLRDBD.TTF"
 Si la police Bradley Hand n'est pas trouvée, l'application utilisera la police par défaut. Cela n'affecte pas la génération, juste le style du texte.
