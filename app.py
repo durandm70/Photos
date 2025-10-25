@@ -64,7 +64,6 @@ class ActionConfig:
         elif action_type == 'collage':
             return {
                 'title': '',
-                'date': '',
                 'ref_image': '',
                 'images': []
             }
@@ -363,13 +362,6 @@ class PhotosApp:
         ttk.Label(self.collage_frame, text="Titre (optionnel) :").grid(row=row, column=0, sticky=tk.W, pady=2)
         self.collage_title_var = tk.StringVar()
         ttk.Entry(self.collage_frame, textvariable=self.collage_title_var).grid(
-            row=row, column=1, sticky=(tk.W, tk.E), padx=(5, 5), columnspan=2)
-
-        # Date
-        row += 1
-        ttk.Label(self.collage_frame, text="Date (YYYY-MM-DD) :").grid(row=row, column=0, sticky=tk.W, pady=2)
-        self.collage_date_var = tk.StringVar()
-        ttk.Entry(self.collage_frame, textvariable=self.collage_date_var).grid(
             row=row, column=1, sticky=(tk.W, tk.E), padx=(5, 5), columnspan=2)
 
         # Image de référence
@@ -1116,7 +1108,6 @@ class PhotosApp:
 
             self.current_action.params = {
                 'title': self.collage_title_var.get(),
-                'date': self.collage_date_var.get(),
                 'ref_image': self.collage_ref_image_var.get(),
                 'images': images
             }
@@ -1156,7 +1147,6 @@ class PhotosApp:
     def _load_collage_params(self, params: Dict[str, Any]):
         """Charge les paramètres d'un collage"""
         self.collage_title_var.set(params.get('title', ''))
-        self.collage_date_var.set(params.get('date', ''))
         self.collage_ref_image_var.set(params.get('ref_image', ''))
 
         # Charger les images
@@ -1411,7 +1401,6 @@ class PhotosApp:
 
             # Récupérer les paramètres
             title = params.get('title') or None
-            date_str = params.get('date') or None
             ref_image = params.get('ref_image') or None
             images = params.get('images', [])
 
@@ -1424,7 +1413,6 @@ class PhotosApp:
             output_file = generate_collage(
                 images,
                 title=title,
-                date_str=date_str,
                 ref_image=ref_image,
                 output_name=action.name,
                 log_callback=self._log
