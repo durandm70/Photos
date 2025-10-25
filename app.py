@@ -13,6 +13,14 @@ from zoneinfo import ZoneInfo
 import threading
 from typing import Dict, List, Optional, Any
 
+# Import du support drag & drop
+try:
+    from tkinterdnd2 import DND_FILES, TkinterDnD
+    HAS_DND = True
+except ImportError:
+    HAS_DND = False
+    print("⚠️ tkinterdnd2 non disponible - fonctionnalité drag & drop désactivée")
+
 # Import des modules locaux
 from photo_utils import ConfigManager, generate_map, parse_ville, generate_collage, generate_titre_jour
 
@@ -117,6 +125,9 @@ class PhotosApp:
 
         # Créer l'interface
         self._create_widgets()
+
+        # Configurer le drag & drop
+        self._setup_drag_drop()
 
         # Charger les paramètres sauvegardés
         self._load_settings()
@@ -316,8 +327,8 @@ class PhotosApp:
         row += 1
         ttk.Label(self.carte_frame, text="Image de référence :").grid(row=row, column=0, sticky=tk.W, pady=2)
         self.carte_ref_image_var = tk.StringVar()
-        ttk.Entry(self.carte_frame, textvariable=self.carte_ref_image_var).grid(
-            row=row, column=1, sticky=(tk.W, tk.E), padx=(5, 5))
+        self.carte_ref_image_entry = ttk.Entry(self.carte_frame, textvariable=self.carte_ref_image_var)
+        self.carte_ref_image_entry.grid(row=row, column=1, sticky=(tk.W, tk.E), padx=(5, 5))
         ttk.Button(self.carte_frame, text="...", width=5,
                    command=self._browse_ref_image).grid(row=row, column=2)
 
@@ -407,6 +418,98 @@ class PhotosApp:
         # Configuration du redimensionnement
         self.titre_jour_frame.columnconfigure(1, weight=1)
         self.titre_jour_frame.rowconfigure(row, weight=1)
+
+    # ========== Drag & Drop ==========
+
+    def _setup_drag_drop(self):
+        """Configure le drag & drop sur les widgets d'images"""
+        if not HAS_DND:
+            return
+
+        # Drag & drop sur l'Entry de l'image de référence (carte)
+        self._enable_drop_on_entry(self.carte_ref_image_entry, self.carte_ref_image_var)
+
+        # Drag & drop sur les Listbox d'images (collage et titreJour)
+        self._enable_drop_on_listbox(self.collage_images_listbox)
+        self._enable_drop_on_listbox(self.titre_jour_images_listbox)
+
+    def _enable_drop_on_entry(self, entry_widget, string_var):
+        """Active le drag & drop sur un widget Entry"""
+        if not HAS_DND:
+            return
+
+        entry_widget.drop_target_register(DND_FILES)
+        entry_widget.dnd_bind('<<Drop>>', lambda e: self._on_drop_entry(e, string_var))
+
+    def _enable_drop_on_listbox(self, listbox_widget):
+        """Active le drag & drop sur un widget Listbox"""
+        if not HAS_DND:
+            return
+
+        listbox_widget.drop_target_register(DND_FILES)
+        listbox_widget.dnd_bind('<<Drop>>', lambda e: self._on_drop_listbox(e, listbox_widget))
+
+    def _parse_dropped_files(self, data: str) -> List[str]:
+        """Parse les fichiers droppés et filtre les images"""
+        files = []
+
+        # Le format de data peut varier selon les systèmes
+        # Généralement, c'est une chaîne avec des chemins séparés par des espaces
+        # et les chemins avec espaces sont entre accolades {}
+        if data.startswith('{'):
+            # Format avec accolades
+            import re
+            files = re.findall(r'\{([^}]+)\}', data)
+            # Aussi ajouter les fichiers sans accolades
+            remaining = re.sub(r'\{[^}]+\}', '', data).strip()
+            if remaining:
+                files.extend(remaining.split())
+        else:
+            # Format simple avec espaces
+            files = data.split()
+
+        # Filtrer uniquement les fichiers images
+        image_extensions = ('.jpg', '.jpeg', '.png', '.JPG', '.JPEG', '.PNG')
+        image_files = [f for f in files if os.path.isfile(f) and f.lower().endswith(image_extensions)]
+
+        return image_files
+
+    def _on_drop_entry(self, event, string_var):
+        """Gère le drop sur un Entry (pour l'image de référence)"""
+        files = self._parse_dropped_files(event.data)
+
+        if files:
+            # Prendre seulement le premier fichier
+            string_var.set(files[0])
+            self._log(f"📎 Image ajoutée par drag & drop : {os.path.basename(files[0])}")
+        else:
+            messagebox.showwarning("Attention", "Aucun fichier image valide détecté")
+
+        return event.action
+
+    def _on_drop_listbox(self, event, listbox_widget):
+        """Gère le drop sur une Listbox (pour les listes d'images)"""
+        files = self._parse_dropped_files(event.data)
+
+        if files:
+            # Récupérer les fichiers déjà présents
+            existing_items = list(listbox_widget.get(0, tk.END))
+
+            # Ajouter les nouveaux fichiers s'ils ne sont pas déjà présents
+            added_count = 0
+            for file in files:
+                if file not in existing_items:
+                    listbox_widget.insert(tk.END, file)
+                    added_count += 1
+
+            if added_count > 0:
+                self._log(f"📎 {added_count} image(s) ajoutée(s) par drag & drop")
+            else:
+                self._log("ℹ️ Toutes les images sont déjà dans la liste")
+        else:
+            messagebox.showwarning("Attention", "Aucun fichier image valide détecté")
+
+        return event.action
 
     # ========== Gestion des fichiers ==========
 
@@ -1292,7 +1395,12 @@ class PhotosApp:
 
 def main():
     """Point d'entrée principal de l'application"""
-    root = tk.Tk()
+    # Utiliser TkinterDnD.Tk si disponible pour le support drag & drop
+    if HAS_DND:
+        root = TkinterDnD.Tk()
+    else:
+        root = tk.Tk()
+
     app = PhotosApp(root)
     root.mainloop()
 
