@@ -1,0 +1,55 @@
+{
+  "target_folder": "/home/user/Photos",
+  "actions": [
+    {
+      "type": "titreJour",
+      "name": "titre_vacances_2024",
+      "params": {
+        "title": "Vacances d'été 2024",
+        "date": "2024-07-15",
+        "images": []
+      }
+    },
+    {
+      "type": "titreJour",
+      "name": "titre_noel_2024",
+      "params": {
+        "title": "Noël en famille",
+        "date": "2024-12-25",
+        "images": []
+      }
+    },
+    {
+      "type": "carte",
+      "name": "carte_randonnee_montagne",
+      "params": {
+        "gpx_file": "",
+        "title": "Randonnée en montagne",
+        "date": "2024-08-10",
+        "start_time": "",
+        "end_time": "",
+        "cities": "Chamonix,Annecy",
+        "margin": "5000",
+        "ref_image": ""
+      }
+    },
+    {
+      "type": "collage",
+      "name": "collage_anniversaire",
+      "params": {
+        "title": "Anniversaire 2024",
+        "date": "2024-06-20",
+        "images": []
+      }
+    },
+    {
+      "type": "collage",
+      "name": "collage_plage",
+      "params": {
+        "title": "Journée à la plage",
+        "date": "",
+        "images": []
+      }
+    }
+  ]
+}
