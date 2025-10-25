@@ -64,7 +64,6 @@ class ActionConfig:
         elif action_type == 'collage':
             return {
                 'title': '',
-                'date': '',
                 'images': []
             }
         elif action_type == 'titreJour':
@@ -362,13 +361,6 @@ class PhotosApp:
         ttk.Label(self.collage_frame, text="Titre (optionnel) :").grid(row=row, column=0, sticky=tk.W, pady=2)
         self.collage_title_var = tk.StringVar()
         ttk.Entry(self.collage_frame, textvariable=self.collage_title_var).grid(
-            row=row, column=1, sticky=(tk.W, tk.E), padx=(5, 5), columnspan=2)
-
-        # Date
-        row += 1
-        ttk.Label(self.collage_frame, text="Date (YYYY-MM-DD) :").grid(row=row, column=0, sticky=tk.W, pady=2)
-        self.collage_date_var = tk.StringVar()
-        ttk.Entry(self.collage_frame, textvariable=self.collage_date_var).grid(
             row=row, column=1, sticky=(tk.W, tk.E), padx=(5, 5), columnspan=2)
 
         # Sélection des images
@@ -1103,7 +1095,6 @@ class PhotosApp:
 
             self.current_action.params = {
                 'title': self.collage_title_var.get(),
-                'date': self.collage_date_var.get(),
                 'images': images
             }
         elif self.current_action.action_type == 'titreJour':
@@ -1142,7 +1133,6 @@ class PhotosApp:
     def _load_collage_params(self, params: Dict[str, Any]):
         """Charge les paramètres d'un collage"""
         self.collage_title_var.set(params.get('title', ''))
-        self.collage_date_var.set(params.get('date', ''))
 
         # Charger les images
         self.collage_images_listbox.delete(0, tk.END)
@@ -1385,7 +1375,6 @@ class PhotosApp:
 
             # Récupérer les paramètres
             title = params.get('title') or None
-            date_str = params.get('date') or None
             images = params.get('images', [])
 
             # Changer vers le dossier du fichier JSON
@@ -1397,7 +1386,6 @@ class PhotosApp:
             output_file = generate_collage(
                 images,
                 title=title,
-                date_str=date_str,
                 output_name=action.name,
                 log_callback=self._log
             )
