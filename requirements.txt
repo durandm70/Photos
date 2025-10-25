@@ -20,6 +20,9 @@ numpy>=1.24.0
 # Interface utilisateur - Drag & Drop
 tkinterdnd2>=0.3.0
 
+# Interface utilisateur - Calendrier
+tkcalendar>=1.6.1
+
 # Support des fuseaux horaires (intégré à Python 3.9+)
 # Si Python < 3.9, décommenter la ligne suivante :
 # backports.zoneinfo>=0.2.1
