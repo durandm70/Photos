@@ -16,6 +16,9 @@ from typing import Dict, List, Optional, Any
 # Import des modules locaux
 from photo_utils import ConfigManager, generate_map, parse_ville, generate_collage, generate_titre_jour
 
+# Version de l'application
+APP_VERSION = "1.0.0"
+
 
 class ActionConfig:
     """Représente une configuration d'action (carte, collage ou titreJour)"""
@@ -88,7 +91,7 @@ class PhotosApp:
     def __init__(self, root):
         """Initialise l'application"""
         self.root = root
-        self.root.title("Photos Manager - Application Unifiée")
+        self.root.title(f"Photos Manager - Application Unifiée v{APP_VERSION}")
 
         # Gestionnaire de configuration
         self.config_manager = ConfigManager()
@@ -504,8 +507,19 @@ class PhotosApp:
 
     # ========== Gestion de la liste d'actions ==========
 
-    def _refresh_actions_list(self):
-        """Rafraîchit l'affichage de la liste des actions"""
+    def _refresh_actions_list(self, keep_selection=False):
+        """Rafraîchit l'affichage de la liste des actions
+
+        Args:
+            keep_selection: Si True, conserve la sélection actuelle après le rafraîchissement
+        """
+        # Sauvegarder la sélection actuelle si nécessaire
+        selected_index = None
+        if keep_selection:
+            selection = self.actions_tree.selection()
+            if selection:
+                selected_index = self.actions_tree.index(selection[0])
+
         # Vider la liste
         for item in self.actions_tree.get_children():
             self.actions_tree.delete(item)
@@ -513,10 +527,16 @@ class PhotosApp:
         # Ajouter les actions
         for action in self.actions:
             type_label = self._get_action_type_label(action.action_type)
-            # Ajouter "*" au nom si la configuration est dirty
-            display_name = f"{action.name} *" if action.dirty else action.name
+            # Ajouter "*" avant le nom si la configuration est dirty
+            display_name = f"* {action.name}" if action.dirty else action.name
             self.actions_tree.insert('', 'end', text=type_label,
                                     values=(display_name,), tags=(action.action_type,))
+
+        # Restaurer la sélection si nécessaire
+        if keep_selection and selected_index is not None:
+            items = self.actions_tree.get_children()
+            if selected_index < len(items):
+                self.actions_tree.selection_set(items[selected_index])
 
     def _get_action_type_label(self, action_type: str) -> str:
         """Retourne le label pour le type d'action"""
@@ -566,8 +586,8 @@ class PhotosApp:
                     messagebox.showerror("Erreur", f"Une configuration avec le nom '{name}' existe déjà", parent=dialog)
                     return
 
-            # Créer la nouvelle action
-            action = ActionConfig(type_var.get(), name)
+            # Créer la nouvelle action avec dirty=True
+            action = ActionConfig(type_var.get(), name, dirty=True)
             self.actions.append(action)
             self.modified = True
             self._refresh_actions_list()
@@ -795,7 +815,8 @@ class PhotosApp:
         new_action = ActionConfig(
             action_type=action.action_type,
             name=new_name,
-            params=copy.deepcopy(action.params)
+            params=copy.deepcopy(action.params),
+            dirty=True
         )
 
         # Ajouter la nouvelle action juste après l'action dupliquée
@@ -862,6 +883,7 @@ class PhotosApp:
 
         # Sauvegarder les anciens paramètres pour comparaison
         old_params = copy.deepcopy(self.current_action.params)
+        old_dirty = self.current_action.dirty
 
         if self.current_action.action_type == 'carte':
             self.current_action.params = {
@@ -898,6 +920,10 @@ class PhotosApp:
         # Marquer comme dirty si les paramètres ont changé
         if old_params != self.current_action.params:
             self.current_action.dirty = True
+
+            # Rafraîchir la liste si le statut dirty a changé, sans désélectionner
+            if old_dirty != self.current_action.dirty:
+                self._refresh_actions_list(keep_selection=True)
 
     def _load_carte_params(self, params: Dict[str, Any]):
         """Charge les paramètres d'une carte"""
