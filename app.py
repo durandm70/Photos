@@ -1350,6 +1350,8 @@ class PhotosApp:
 
             # Marquer la configuration comme non-dirty après génération réussie
             action.dirty = False
+            # Décocher automatiquement quand dirty est mis à false
+            action.checked = False
             self.root.after(0, self._refresh_actions_list)
 
             self._log(f"✅ Génération de '{action.name}' terminée avec succès !")
@@ -1402,6 +1404,8 @@ class PhotosApp:
 
             # Marquer la configuration comme non-dirty après génération réussie
             action.dirty = False
+            # Décocher automatiquement quand dirty est mis à false
+            action.checked = False
             self.root.after(0, self._refresh_actions_list)
 
             self._log(f"✅ Collage généré : {output_file}")
@@ -1466,6 +1470,8 @@ class PhotosApp:
 
             # Marquer la configuration comme non-dirty après génération réussie
             action.dirty = False
+            # Décocher automatiquement quand dirty est mis à false
+            action.checked = False
             self.root.after(0, self._refresh_actions_list)
 
             self._log(f"✅ Titre du jour généré : {output_file}")
