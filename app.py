@@ -7,6 +7,7 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, scrolledtext
 import os
 import json
+import copy
 from datetime import datetime
 from zoneinfo import ZoneInfo
 import threading
@@ -201,6 +202,15 @@ class PhotosApp:
                    command=self._move_action_up).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=2)
         ttk.Button(buttons_frame1, text="Bas",
                    command=self._move_action_down).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(2, 0))
+
+        # Boutons d'action - ligne 1.5
+        buttons_frame1_5 = ttk.Frame(top_frame)
+        buttons_frame1_5.pack(fill=tk.X, pady=(2, 2))
+
+        ttk.Button(buttons_frame1_5, text="Renommer",
+                   command=self._rename_action).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 2))
+        ttk.Button(buttons_frame1_5, text="Dupliquer",
+                   command=self._duplicate_action).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(2, 0))
 
         # Bouton génération - ligne 2
         ttk.Button(top_frame, text="Générer l'image",
@@ -646,6 +656,127 @@ class PhotosApp:
         # Resélectionner l'élément
         items = self.actions_tree.get_children()
         self.actions_tree.selection_set(items[index + 1])
+
+    def _rename_action(self):
+        """Renomme l'action sélectionnée"""
+        selection = self.actions_tree.selection()
+        if not selection:
+            messagebox.showwarning("Attention", "Veuillez sélectionner une action à renommer")
+            return
+
+        # Récupérer l'index de l'action
+        item = selection[0]
+        index = self.actions_tree.index(item)
+        action = self.actions[index]
+
+        # Créer une fenêtre de dialogue
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Renommer l'action")
+        dialog.transient(self.root)
+        dialog.grab_set()
+
+        # Nom actuel
+        ttk.Label(dialog, text="Nom actuel :").grid(row=0, column=0, sticky=tk.W, padx=10, pady=5)
+        ttk.Label(dialog, text=action.name, font=('TkDefaultFont', 10, 'bold')).grid(
+            row=0, column=1, sticky=tk.W, padx=10, pady=5)
+
+        # Nouveau nom
+        ttk.Label(dialog, text="Nouveau nom :").grid(row=1, column=0, sticky=tk.W, padx=10, pady=5)
+        name_var = tk.StringVar(value=action.name)
+        name_entry = ttk.Entry(dialog, textvariable=name_var, width=30)
+        name_entry.grid(row=1, column=1, sticky=(tk.W, tk.E), padx=10, pady=5)
+        name_entry.focus()
+        name_entry.select_range(0, tk.END)
+
+        # Boutons
+        btn_frame = ttk.Frame(dialog)
+        btn_frame.grid(row=2, column=0, columnspan=2, pady=10)
+
+        def on_ok():
+            new_name = name_var.get().strip()
+            if not new_name:
+                messagebox.showerror("Erreur", "Veuillez saisir un nom", parent=dialog)
+                return
+
+            # Vérifier qu'il n'y a pas déjà une autre action avec ce nom
+            for i, other_action in enumerate(self.actions):
+                if i != index and other_action.name == new_name:
+                    messagebox.showerror("Erreur", f"Une configuration avec le nom '{new_name}' existe déjà", parent=dialog)
+                    return
+
+            # Renommer l'action
+            action.name = new_name
+            self.modified = True
+            self._refresh_actions_list()
+
+            # Resélectionner l'élément renommé
+            items = self.actions_tree.get_children()
+            self.actions_tree.selection_set(items[index])
+
+            # Mettre à jour le titre du panneau de détail
+            if self.current_action == action:
+                type_label = self._get_action_type_label(action.action_type)
+                self.detail_title.config(text=f"{type_label} - {action.name}")
+
+            dialog.destroy()
+
+        def on_cancel():
+            dialog.destroy()
+
+        ttk.Button(btn_frame, text="OK", command=on_ok).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame, text="Annuler", command=on_cancel).pack(side=tk.LEFT, padx=5)
+
+        # Enter pour valider
+        dialog.bind('<Return>', lambda e: on_ok())
+        dialog.bind('<Escape>', lambda e: on_cancel())
+
+        # Centrer la fenêtre
+        dialog.update_idletasks()
+        x = (dialog.winfo_screenwidth() // 2) - (dialog.winfo_width() // 2)
+        y = (dialog.winfo_screenheight() // 2) - (dialog.winfo_height() // 2)
+        dialog.geometry(f'+{x}+{y}')
+
+    def _duplicate_action(self):
+        """Duplique l'action sélectionnée"""
+        selection = self.actions_tree.selection()
+        if not selection:
+            messagebox.showwarning("Attention", "Veuillez sélectionner une action à dupliquer")
+            return
+
+        # Récupérer l'index de l'action
+        item = selection[0]
+        index = self.actions_tree.index(item)
+        action = self.actions[index]
+
+        # Sauvegarder la configuration actuelle avant de dupliquer
+        self._save_current_action()
+
+        # Générer un nouveau nom unique en ajoutant "_" jusqu'à ce qu'il n'y ait plus de conflit
+        new_name = action.name + "_"
+        existing_names = {a.name for a in self.actions}
+
+        while new_name in existing_names:
+            new_name += "_"
+
+        # Créer une copie de l'action avec le nouveau nom
+        # On copie les paramètres en profondeur pour éviter les références partagées
+        new_action = ActionConfig(
+            action_type=action.action_type,
+            name=new_name,
+            params=copy.deepcopy(action.params)
+        )
+
+        # Ajouter la nouvelle action juste après l'action dupliquée
+        self.actions.insert(index + 1, new_action)
+        self.modified = True
+        self._refresh_actions_list()
+
+        # Sélectionner la nouvelle action
+        items = self.actions_tree.get_children()
+        self.actions_tree.selection_set(items[index + 1])
+        self._on_action_select(None)
+
+        self._log(f"Configuration '{action.name}' dupliquée sous le nom '{new_name}'")
 
     def _on_action_select(self, event):
         """Appelé quand une action est sélectionnée"""
