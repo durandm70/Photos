@@ -85,19 +85,16 @@ def generate_collage(image_paths, title=None, date_str=None, output_name=None, l
     canvas = Image.new("RGB", (W, H), background_color)
     draw = ImageDraw.Draw(canvas)
 
-    # Zone pour les photos avec titre et date
+    # Zone pour les photos avec titre
     margin = 30
     if title:
         try:
             font_title = ImageFont.truetype("arial.ttf", 120)
-            font_date = ImageFont.truetype("arial.ttf", 80)
         except:
             font_title = ImageFont.load_default()
-            font_date = ImageFont.load_default()
 
-        header_height = 250
+        header_height = 180
         draw.text((margin, margin), title, font=font_title, fill="white")
-        draw.text((margin, margin + 140), date_str, font=font_date, fill="white")
         photo_area = (margin, header_height, W - margin, H - margin)
     else:
         photo_area = (margin, margin, W - margin, H - margin)
