@@ -131,6 +131,9 @@ class PhotosApp:
         # Date mémorisée pour initialiser les nouvelles configurations
         self.last_selected_date: Optional[str] = None
 
+        # Fichier GPX mémorisé pour initialiser les nouvelles configurations "carte"
+        self.last_gpx_file: Optional[str] = None
+
         # Restaurer la géométrie de la fenêtre
         geometry = self.config_manager.get("window_geometry", "1200x800")
         self.root.geometry(geometry)
@@ -601,6 +604,9 @@ class PhotosApp:
                 # Charger la date mémorisée
                 self.last_selected_date = data.get('last_selected_date', None)
 
+                # Charger le fichier GPX mémorisé
+                self.last_gpx_file = data.get('last_gpx_file', None)
+
                 self._refresh_actions_list()
                 self._log(f"Fichier chargé : {filename}")
 
@@ -635,7 +641,8 @@ class PhotosApp:
             data = {
                 'version': 2,
                 'actions': [action.to_dict() for action in self.actions],
-                'last_selected_date': self.last_selected_date
+                'last_selected_date': self.last_selected_date,
+                'last_gpx_file': self.last_gpx_file
             }
 
             with open(filename, 'w', encoding='utf-8') as f:
@@ -771,6 +778,10 @@ class PhotosApp:
                     action.params['date'] = self.last_selected_date
                 elif action.action_type == 'titreJour':
                     action.params['date'] = self.last_selected_date
+
+            # Initialiser le champ GPX avec le dernier fichier GPX sélectionné
+            if self.last_gpx_file and action.action_type == 'carte':
+                action.params['gpx_file'] = self.last_gpx_file
 
             return action
 
@@ -1330,6 +1341,9 @@ class PhotosApp:
         )
         if filename:
             self.carte_gpx_var.set(filename)
+            # Mémoriser le dernier fichier GPX sélectionné
+            self.last_gpx_file = filename
+            self._log(f"📍 Fichier GPX mémorisé : {os.path.basename(filename)}")
 
     def _browse_ref_image(self):
         """Ouvre un dialogue pour sélectionner l'image de référence (carte)"""
