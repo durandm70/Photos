@@ -23,12 +23,29 @@ def get_photo_date(img_path):
     # Fallback : utiliser la date de modification du fichier
     return datetime.fromtimestamp(os.path.getmtime(img_path))
 
-def generate_collage(image_paths, title=None):
+def generate_collage(image_paths, title=None, ref_image=None):
     """Génère un collage à partir d'une liste d'images."""
-    
-    # Récupérer la date la plus tôt de toutes les photos
-    photo_dates = [get_photo_date(path) for path in image_paths]
-    first_photo_date = min(photo_dates)
+
+    # Déterminer la date de référence pour le calcul
+    if ref_image:
+        # Si une image de référence est fournie, utiliser sa date
+        if not os.path.isfile(ref_image):
+            print(f"❌ Image de référence non trouvée : {ref_image}")
+            sys.exit(1)
+        reference_date = get_photo_date(ref_image)
+        print(f"➡ Utilisation de l'image de référence : {os.path.basename(ref_image)}")
+        print(f"➡ Date de référence : {reference_date.strftime('%Y-%m-%d %H:%M:%S')}")
+    else:
+        # Sinon, utiliser la date la plus tôt de toutes les photos
+        photo_dates = [get_photo_date(path) for path in image_paths]
+        reference_date = min(photo_dates)
+        print(f"➡ Utilisation de la photo la plus vieille comme référence")
+        print(f"➡ Date de référence : {reference_date.strftime('%Y-%m-%d %H:%M:%S')}")
+
+    # Calculer la date taken finale : date de référence - 30 secondes
+    from datetime import timedelta
+    first_photo_date = reference_date - timedelta(seconds=30)
+    print(f"➡ Date taken du collage (référence - 30s) : {first_photo_date.strftime('%Y-%m-%d %H:%M:%S')}")
     date_str = first_photo_date.strftime("%Y-%m-%d")
     
     # Utiliser le titre fourni ou générer le nom par défaut
@@ -152,9 +169,10 @@ def generate_collage(image_paths, title=None):
     
     # Sauvegarde
     canvas.save(output, "JPEG", quality=95)
-    
-    # Ajouter EXIF avec 5 étoiles
+
+    # Ajouter EXIF avec 5 étoiles et la date/heure calculée (référence - 30s)
     try:
+        # Utiliser la date calculée (first_photo_date qui contient déjà référence - 30s)
         dt_str = first_photo_date.strftime("%Y:%m:%d %H:%M:%S")
         zeroth_ifd = {
             piexif.ImageIFD.Software: "Collage Generator",
@@ -179,31 +197,36 @@ def generate_collage(image_paths, title=None):
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Usage: python collage.py <img1> [<img2> ... <img7>] [--titre 'Titre du collage']")
+        print("Usage: python collage.py <img1> [<img2> ... <img7>] [--titre 'Titre du collage'] [--ref-image 'image_ref.jpg']")
         print("Exemple: python collage.py photo1.jpg photo2.jpg photo3.jpg --titre 'Vacances'")
+        print("Exemple avec ref: python collage.py photo1.jpg photo2.jpg --ref-image ref.jpg")
         sys.exit(1)
-    
+
     # Parser les arguments
     image_paths = []
     title = None
-    
+    ref_image = None
+
     i = 1
     while i < len(sys.argv):
         if sys.argv[i] == "--titre" and i + 1 < len(sys.argv):
             title = sys.argv[i + 1]
             i += 2
+        elif sys.argv[i] == "--ref-image" and i + 1 < len(sys.argv):
+            ref_image = sys.argv[i + 1]
+            i += 2
         else:
             image_paths.append(sys.argv[i])
             i += 1
-    
+
     if len(image_paths) < 2 or len(image_paths) > 7:
         print("❌ Veuillez fournir entre 2 et 7 images.")
         sys.exit(1)
-    
+
     # Vérifier que les images existent
     for path in image_paths:
         if not os.path.isfile(path):
             print(f"❌ Fichier non trouvé : {path}")
             sys.exit(1)
-    
-    generate_collage(image_paths, title)
+
+    generate_collage(image_paths, title, ref_image)

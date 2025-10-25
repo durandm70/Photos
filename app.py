@@ -65,6 +65,7 @@ class ActionConfig:
             return {
                 'title': '',
                 'date': '',
+                'ref_image': '',
                 'images': []
             }
         elif action_type == 'titreJour':
@@ -371,8 +372,19 @@ class PhotosApp:
         ttk.Entry(self.collage_frame, textvariable=self.collage_date_var).grid(
             row=row, column=1, sticky=(tk.W, tk.E), padx=(5, 5), columnspan=2)
 
-        # Sélection des images
+        # Image de référence
         row += 1
+        ttk.Label(self.collage_frame, text="Image de référence :").grid(row=row, column=0, sticky=tk.W, pady=2)
+        self.collage_ref_image_var = tk.StringVar()
+        self.collage_ref_image_entry = ttk.Entry(self.collage_frame, textvariable=self.collage_ref_image_var)
+        self.collage_ref_image_entry.grid(row=row, column=1, sticky=(tk.W, tk.E), padx=(5, 5))
+        ttk.Button(self.collage_frame, text="...", width=5,
+                   command=self._browse_collage_ref_image).grid(row=row, column=2)
+        ttk.Label(self.collage_frame, text="(optionnel - sinon utilise la photo la plus vieille)",
+                  font=('TkDefaultFont', 8)).grid(row=row+1, column=1, sticky=tk.W, padx=(5, 0))
+
+        # Sélection des images
+        row += 2
         ttk.Label(self.collage_frame, text="Images :").grid(row=row, column=0, sticky=tk.W, pady=2)
         btn_frame = ttk.Frame(self.collage_frame)
         btn_frame.grid(row=row, column=1, sticky=tk.W, padx=(5, 5), columnspan=2)
@@ -444,8 +456,9 @@ class PhotosApp:
         if not HAS_DND:
             return
 
-        # Drag & drop sur l'Entry de l'image de référence (carte)
+        # Drag & drop sur les Entry d'image de référence
         self._enable_drop_on_entry(self.carte_ref_image_entry, self.carte_ref_image_var)
+        self._enable_drop_on_entry(self.collage_ref_image_entry, self.collage_ref_image_var)
 
         # Drag & drop sur les Listbox d'images (collage et titreJour)
         self._enable_drop_on_listbox(self.collage_images_listbox)
@@ -1104,6 +1117,7 @@ class PhotosApp:
             self.current_action.params = {
                 'title': self.collage_title_var.get(),
                 'date': self.collage_date_var.get(),
+                'ref_image': self.collage_ref_image_var.get(),
                 'images': images
             }
         elif self.current_action.action_type == 'titreJour':
@@ -1143,6 +1157,7 @@ class PhotosApp:
         """Charge les paramètres d'un collage"""
         self.collage_title_var.set(params.get('title', ''))
         self.collage_date_var.set(params.get('date', ''))
+        self.collage_ref_image_var.set(params.get('ref_image', ''))
 
         # Charger les images
         self.collage_images_listbox.delete(0, tk.END)
@@ -1213,7 +1228,7 @@ class PhotosApp:
             self.carte_gpx_var.set(filename)
 
     def _browse_ref_image(self):
-        """Ouvre un dialogue pour sélectionner l'image de référence"""
+        """Ouvre un dialogue pour sélectionner l'image de référence (carte)"""
         initial_dir = os.path.dirname(self.current_file) if self.current_file else os.getcwd()
         filename = filedialog.askopenfilename(
             title="Sélectionner l'image de référence",
@@ -1222,6 +1237,17 @@ class PhotosApp:
         )
         if filename:
             self.carte_ref_image_var.set(filename)
+
+    def _browse_collage_ref_image(self):
+        """Ouvre un dialogue pour sélectionner l'image de référence (collage)"""
+        initial_dir = os.path.dirname(self.current_file) if self.current_file else os.getcwd()
+        filename = filedialog.askopenfilename(
+            title="Sélectionner l'image de référence",
+            initialdir=initial_dir,
+            filetypes=[("Images", "*.jpg *.jpeg *.png"), ("Tous les fichiers", "*.*")]
+        )
+        if filename:
+            self.collage_ref_image_var.set(filename)
 
     # ========== Génération ==========
 
@@ -1384,6 +1410,7 @@ class PhotosApp:
             # Récupérer les paramètres
             title = params.get('title') or None
             date_str = params.get('date') or None
+            ref_image = params.get('ref_image') or None
             images = params.get('images', [])
 
             # Changer vers le dossier du fichier JSON
@@ -1396,6 +1423,7 @@ class PhotosApp:
                 images,
                 title=title,
                 date_str=date_str,
+                ref_image=ref_image,
                 output_name=action.name,
                 log_callback=self._log
             )
