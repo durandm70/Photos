@@ -20,7 +20,7 @@ from photo_utils import ConfigManager, generate_map, parse_ville, generate_colla
 class ActionConfig:
     """Représente une configuration d'action (carte, collage ou titreJour)"""
 
-    def __init__(self, action_type: str, name: str, params: Optional[Dict[str, Any]] = None):
+    def __init__(self, action_type: str, name: str, params: Optional[Dict[str, Any]] = None, dirty: bool = False):
         """
         Initialise une configuration d'action
 
@@ -28,10 +28,12 @@ class ActionConfig:
             action_type: Type d'action ('carte', 'collage', 'titreJour')
             name: Nom de l'action (nom du fichier de sortie)
             params: Paramètres de configuration spécifiques au type
+            dirty: Indique si la configuration a été modifiée depuis la dernière génération
         """
         self.action_type = action_type
         self.name = name
         self.params = params or self._get_default_params(action_type)
+        self.dirty = dirty
 
     def _get_default_params(self, action_type: str) -> Dict[str, Any]:
         """Retourne les paramètres par défaut selon le type d'action"""
@@ -65,7 +67,8 @@ class ActionConfig:
         return {
             'type': self.action_type,
             'name': self.name,
-            'params': self.params
+            'params': self.params,
+            'dirty': self.dirty
         }
 
     @staticmethod
@@ -74,7 +77,8 @@ class ActionConfig:
         return ActionConfig(
             action_type=data['type'],
             name=data['name'],
-            params=data.get('params', {})
+            params=data.get('params', {}),
+            dirty=data.get('dirty', False)
         )
 
 
@@ -509,8 +513,10 @@ class PhotosApp:
         # Ajouter les actions
         for action in self.actions:
             type_label = self._get_action_type_label(action.action_type)
+            # Ajouter "*" au nom si la configuration est dirty
+            display_name = f"{action.name} *" if action.dirty else action.name
             self.actions_tree.insert('', 'end', text=type_label,
-                                    values=(action.name,), tags=(action.action_type,))
+                                    values=(display_name,), tags=(action.action_type,))
 
     def _get_action_type_label(self, action_type: str) -> str:
         """Retourne le label pour le type d'action"""
@@ -704,6 +710,32 @@ class PhotosApp:
                     messagebox.showerror("Erreur", f"Une configuration avec le nom '{new_name}' existe déjà", parent=dialog)
                     return
 
+            # Renommer le fichier image si nécessaire
+            old_name = action.name
+            if self.current_file and old_name != new_name:
+                target_folder = os.path.dirname(self.current_file)
+                old_image_path = os.path.join(target_folder, f"{old_name}.jpg")
+                new_image_path = os.path.join(target_folder, f"{new_name}.jpg")
+
+                # Si l'ancien fichier image existe
+                if os.path.exists(old_image_path):
+                    # Vérifier si le nouveau fichier existe déjà
+                    if os.path.exists(new_image_path):
+                        messagebox.showerror("Erreur",
+                            f"Impossible de renommer l'image : le fichier '{new_name}.jpg' existe déjà",
+                            parent=dialog)
+                        return
+
+                    try:
+                        # Renommer le fichier image
+                        os.rename(old_image_path, new_image_path)
+                        self._log(f"Image renommée : {old_name}.jpg → {new_name}.jpg")
+                    except Exception as e:
+                        messagebox.showerror("Erreur",
+                            f"Erreur lors du renommage de l'image : {str(e)}",
+                            parent=dialog)
+                        return
+
             # Renommer l'action
             action.name = new_name
             self.modified = True
@@ -828,6 +860,9 @@ class PhotosApp:
 
         self.modified = True
 
+        # Sauvegarder les anciens paramètres pour comparaison
+        old_params = copy.deepcopy(self.current_action.params)
+
         if self.current_action.action_type == 'carte':
             self.current_action.params = {
                 'gpx_file': self.carte_gpx_var.get(),
@@ -859,6 +894,10 @@ class PhotosApp:
                 'date': self.titre_jour_date_var.get(),
                 'images': images
             }
+
+        # Marquer comme dirty si les paramètres ont changé
+        if old_params != self.current_action.params:
+            self.current_action.dirty = True
 
     def _load_carte_params(self, params: Dict[str, Any]):
         """Charge les paramètres d'une carte"""
@@ -1067,6 +1106,10 @@ class PhotosApp:
                 log_callback=self._log
             )
 
+            # Marquer la configuration comme non-dirty après génération réussie
+            self.current_action.dirty = False
+            self.root.after(0, self._refresh_actions_list)
+
             self._log("✅ Génération terminée avec succès !")
 
         except Exception as e:
@@ -1115,6 +1158,10 @@ class PhotosApp:
                 output_name=self.current_action.name,
                 log_callback=self._log
             )
+
+            # Marquer la configuration comme non-dirty après génération réussie
+            self.current_action.dirty = False
+            self.root.after(0, self._refresh_actions_list)
 
             self._log(f"✅ Collage généré : {output_file}")
 
@@ -1176,6 +1223,10 @@ class PhotosApp:
                 output_name=self.current_action.name,
                 log_callback=self._log
             )
+
+            # Marquer la configuration comme non-dirty après génération réussie
+            self.current_action.dirty = False
+            self.root.after(0, self._refresh_actions_list)
 
             self._log(f"✅ Titre du jour généré : {output_file}")
 
