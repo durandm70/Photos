@@ -307,6 +307,7 @@ class PhotosApp:
         # Fichier GPX
         ttk.Label(self.carte_frame, text="Fichier GPX :").grid(row=row, column=0, sticky=tk.W, pady=2)
         self.carte_gpx_var = tk.StringVar()
+        self.carte_gpx_var.trace_add('write', self._on_gpx_file_changed)
         gpx_entry = ttk.Entry(self.carte_frame, textvariable=self.carte_gpx_var)
         gpx_entry.grid(row=row, column=1, sticky=(tk.W, tk.E), padx=(5, 5))
         ttk.Button(self.carte_frame, text="...", width=5,
@@ -1331,6 +1332,12 @@ class PhotosApp:
 
     # ========== Parcourir les fichiers ==========
 
+    def _on_gpx_file_changed(self, *args):
+        """Callback appelé quand le chemin du fichier GPX change (saisie manuelle ou sélection)"""
+        gpx_path = self.carte_gpx_var.get().strip()
+        if gpx_path and gpx_path.lower().endswith('.gpx'):
+            self.last_gpx_file = gpx_path
+
     def _browse_gpx_file(self):
         """Ouvre un dialogue pour sélectionner le fichier GPX"""
         initial_dir = os.path.dirname(self.current_file) if self.current_file else os.getcwd()
@@ -1341,9 +1348,8 @@ class PhotosApp:
         )
         if filename:
             self.carte_gpx_var.set(filename)
-            # Mémoriser le dernier fichier GPX sélectionné
-            self.last_gpx_file = filename
-            self._log(f"📍 Fichier GPX mémorisé : {os.path.basename(filename)}")
+            # Le fichier est automatiquement mémorisé via le callback _on_gpx_file_changed
+            self._log(f"📍 Fichier GPX sélectionné : {os.path.basename(filename)}")
 
     def _browse_ref_image(self):
         """Ouvre un dialogue pour sélectionner l'image de référence (carte)"""
