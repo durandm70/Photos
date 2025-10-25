@@ -188,7 +188,7 @@ def generate_titre_jour(image_paths, date_str, title, output_name=None, log_call
 
     # Ajouter EXIF
     try:
-        dt = datetime.strptime(date_str, "%Y-%m-%d").replace(hour=2, minute=0, second=0)
+        dt = datetime.strptime(date_str, "%Y-%m-%d").replace(hour=0, minute=0, second=0)
         dt_str = dt.strftime("%Y:%m:%d %H:%M:%S")
         zeroth_ifd = {
             piexif.ImageIFD.Software: "Python Collage Script",
