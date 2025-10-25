@@ -50,6 +50,45 @@ def calculate_zoom_for_extent(xmin, ymin, xmax, ymax, width_px, height_px):
     return max(0, min(zoom, 18))
 
 
+def adjust_bounds_to_ratio(xmin, ymin, xmax, ymax, target_ratio=4/3, log_callback=None):
+    """
+    Ajuste les bounds pour respecter un ratio largeur/hauteur donné.
+    Le trajet reste centré en étendant la dimension la plus petite proportionnellement.
+
+    Args:
+        xmin, ymin, xmax, ymax: Bounds actuels (EPSG:3857)
+        target_ratio: Ratio cible largeur/hauteur (par défaut 4:3)
+        log_callback: Fonction de callback pour les logs (optionnel)
+
+    Returns:
+        xmin, ymin, xmax, ymax: Bounds ajustés
+    """
+    current_width = xmax - xmin
+    current_height = ymax - ymin
+    current_ratio = current_width / current_height
+
+    # Calculer le centre
+    center_x = (xmin + xmax) / 2
+    center_y = (ymin + ymax) / 2
+
+    if current_ratio > target_ratio:
+        # La largeur est trop grande par rapport à la hauteur
+        # Il faut augmenter la hauteur
+        new_height = current_width / target_ratio
+        ymin = center_y - new_height / 2
+        ymax = center_y + new_height / 2
+    elif current_ratio < target_ratio:
+        # La hauteur est trop grande par rapport à la largeur
+        # Il faut augmenter la largeur
+        new_width = current_height * target_ratio
+        xmin = center_x - new_width / 2
+        xmax = center_x + new_width / 2
+
+    log(f"📐 Ajustement au ratio {target_ratio:.2f} : {current_width:.0f}x{current_height:.0f}m → {xmax-xmin:.0f}x{ymax-ymin:.0f}m", log_callback)
+
+    return xmin, ymin, xmax, ymax
+
+
 def parse_position(position_str):
     """
     Parse une chaîne de position (N, S, E, O, NE, NO, SE, SO)
@@ -350,6 +389,10 @@ def generate_map(gpx_file, start_time, end_time, city_list, output_filename,
                 log(f"⚠ Ville '{ville}' en dehors du périmètre, ignorée", log_callback)
 
     xmin, ymin, xmax, ymax = buffered.total_bounds
+
+    # Ajuster les bounds pour respecter le ratio 4:3
+    xmin, ymin, xmax, ymax = adjust_bounds_to_ratio(xmin, ymin, xmax, ymax, target_ratio=4/3, log_callback=log_callback)
+
     fig, ax = plt.subplots(figsize=(12, 9))
 
     draw_arrows(ax, gdf_line_proj.geometry[0], 1000 / (2 ** (zoom - 12)))
