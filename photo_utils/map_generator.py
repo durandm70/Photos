@@ -103,26 +103,28 @@ def adjust_text_position(city_x, city_y, xmin, xmax, ymin, ymax, ax, name, force
     )
 
 
-def set_exif_date_piexif(output_file, taken_date, log_callback=None):
-    """Applique la date EXIF à partir d'une date donnée (datetime)"""
+def set_exif_date_piexif(output_file, reference_img, log_callback=None):
+    """Applique la date EXIF à partir d'une image de référence"""
     try:
-        if taken_date is None:
-            log("⚠ Aucune date fournie pour les métadonnées EXIF", log_callback)
-            return
-
-        # Convertir taken_date en datetime naïf si nécessaire
-        if taken_date.tzinfo is not None:
-            taken_date = taken_date.replace(tzinfo=None)
-
+        dt_orig = None
+        if os.path.exists(reference_img) and reference_img.lower().endswith((".jpg", ".jpeg")):
+            img = Image.open(reference_img)
+            exif_dict = piexif.load(img.info.get("exif", b""))
+            dt_bytes = exif_dict["Exif"].get(piexif.ExifIFD.DateTimeOriginal)
+            if dt_bytes:
+                dt_orig = datetime.datetime.strptime(dt_bytes.decode(), "%Y:%m:%d %H:%M:%S")
+        if dt_orig is None:
+            dt_orig = datetime.datetime.fromtimestamp(os.path.getctime(reference_img))
+        dt_new = dt_orig - datetime.timedelta(seconds=10)
         exif_dict_new = {"0th": {}, "Exif": {}, "GPS": {}, "Interop": {}, "1st": {}, "thumbnail": None}
-        dt_str = taken_date.strftime("%Y:%m:%d %H:%M:%S")
+        dt_str = dt_new.strftime("%Y:%m:%d %H:%M:%S")
         exif_dict_new["Exif"][piexif.ExifIFD.DateTimeOriginal] = dt_str.encode()
         exif_dict_new["0th"][piexif.ImageIFD.DateTime] = dt_str.encode()
         exif_dict_new["0th"][piexif.ImageIFD.Rating] = 5
         exif_bytes = piexif.dump(exif_dict_new)
         img_out = Image.open(output_file)
         img_out.save(output_file, "JPEG", exif=exif_bytes)
-        log(f"✅ Date taken appliquée : {dt_str}", log_callback)
+        log("✅ Date taken appliquée avec piexif", log_callback)
     except Exception as e:
         log(f"⚠ Impossible d'appliquer la date EXIF : {e}", log_callback)
 
@@ -257,18 +259,14 @@ def generate_map(gpx_file, start_time, end_time, city_list, output_filename,
     Args:
         gpx_file: Chemin du fichier GPX
         start_time: Date/heure de début (datetime aware ou None pour tous les points)
-                   Cette date sera également utilisée comme "taken date" EXIF de l'image générée
         end_time: Date/heure de fin (datetime aware ou None pour tous les points)
         city_list: Liste de tuples (ville, nom_affichage, position)
         output_filename: Nom du fichier de sortie (sans extension)
-        ref_image: (Déprécié) N'est plus utilisé. La date EXIF est maintenant basée sur start_time
+        ref_image: Image de référence pour la date EXIF (optionnel)
         marge: Marge autour de la trace en mètres (optionnel)
         titre: Titre à afficher sur la carte (optionnel)
         log_callback: Fonction de callback pour les logs (optionnel)
     """
-    if ref_image:
-        log("⚠ Le paramètre ref_image n'est plus utilisé. La date EXIF sera basée sur start_time.", log_callback)
-
     log("📖 Lecture du fichier GPX", log_callback)
     with open(gpx_file, "r", encoding="utf-8") as f:
         gpx = gpxpy.parse(f)
@@ -382,5 +380,5 @@ def generate_map(gpx_file, start_time, end_time, city_list, output_filename,
     Image.open(buf).convert("RGB").save(output_file, "JPEG")
     log(f"✅ Fichier généré : {output_file}", log_callback)
 
-    if start_time:
-        set_exif_date_piexif(output_file, start_time, log_callback)
+    if ref_image and os.path.exists(ref_image):
+        set_exif_date_piexif(output_file, ref_image, log_callback)
