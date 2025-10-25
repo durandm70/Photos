@@ -38,7 +38,6 @@
       "name": "collage_anniversaire",
       "params": {
         "title": "Anniversaire 2024",
-        "date": "2024-06-20",
         "images": []
       }
     },
@@ -47,7 +46,6 @@
       "name": "collage_plage",
       "params": {
         "title": "Journée à la plage",
-        "date": "",
         "images": []
       }
     }

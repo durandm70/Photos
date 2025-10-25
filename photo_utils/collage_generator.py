@@ -36,14 +36,13 @@ def get_photo_date(img_path):
     return datetime.fromtimestamp(os.path.getmtime(img_path))
 
 
-def generate_collage(image_paths, title=None, date_str=None, ref_image=None, output_name=None, log_callback=None):
+def generate_collage(image_paths, title=None, ref_image=None, output_name=None, log_callback=None):
     """
     Génère un collage à partir d'une liste d'images
 
     Args:
         image_paths: Liste des chemins des images
         title: Titre à afficher (optionnel)
-        date_str: Date à afficher au format YYYY-MM-DD (optionnel)
         ref_image: Chemin de l'image de référence pour la date taken (optionnel)
         output_name: Nom du fichier de sortie sans extension (optionnel)
         log_callback: Fonction de callback pour les logs (optionnel)
@@ -79,17 +78,13 @@ def generate_collage(image_paths, title=None, date_str=None, ref_image=None, out
     first_photo_date = reference_date - timedelta(seconds=30)
     log(f"Date taken du collage (référence - 30s) : {first_photo_date.strftime('%Y-%m-%d %H:%M:%S')}", log_callback)
 
-    # Utiliser la date fournie ou celle de la photo
-    if not date_str:
-        date_str = first_photo_date.strftime("%Y-%m-%d")
-
     # Déterminer le nom de fichier de sortie
     if output_name:
         output = f"{output_name}.jpg"
     elif title:
         output = f"{title}.jpg"
     else:
-        output = f"collage_{date_str}.jpg"
+        output = f"collage_{first_photo_date.strftime('%Y-%m-%d')}.jpg"
 
     log(f"🎨 Génération du collage avec {len(image_paths)} images", log_callback)
 
@@ -102,19 +97,16 @@ def generate_collage(image_paths, title=None, date_str=None, ref_image=None, out
     canvas = Image.new("RGB", (W, H), background_color)
     draw = ImageDraw.Draw(canvas)
 
-    # Zone pour les photos avec titre et date
+    # Zone pour les photos avec titre
     margin = 30
     if title:
         try:
             font_title = ImageFont.truetype("arial.ttf", 120)
-            font_date = ImageFont.truetype("arial.ttf", 80)
         except:
             font_title = ImageFont.load_default()
-            font_date = ImageFont.load_default()
 
-        header_height = 250
+        header_height = 180
         draw.text((margin, margin), title, font=font_title, fill="white")
-        draw.text((margin, margin + 140), date_str, font=font_date, fill="white")
         photo_area = (margin, header_height, W - margin, H - margin)
     else:
         photo_area = (margin, margin, W - margin, H - margin)
