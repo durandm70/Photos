@@ -36,7 +36,7 @@ def get_photo_date(img_path):
     return datetime.fromtimestamp(os.path.getmtime(img_path))
 
 
-def generate_collage(image_paths, title=None, date_str=None, output_name=None, log_callback=None):
+def generate_collage(image_paths, title=None, date_str=None, ref_image=None, output_name=None, log_callback=None):
     """
     Génère un collage à partir d'une liste d'images
 
@@ -44,6 +44,7 @@ def generate_collage(image_paths, title=None, date_str=None, output_name=None, l
         image_paths: Liste des chemins des images
         title: Titre à afficher (optionnel)
         date_str: Date à afficher au format YYYY-MM-DD (optionnel)
+        ref_image: Chemin de l'image de référence pour la date taken (optionnel)
         output_name: Nom du fichier de sortie sans extension (optionnel)
         log_callback: Fonction de callback pour les logs (optionnel)
 
@@ -58,9 +59,25 @@ def generate_collage(image_paths, title=None, date_str=None, output_name=None, l
         if not os.path.isfile(path):
             raise FileNotFoundError(f"Fichier non trouvé : {path}")
 
-    # Récupérer la date la plus tôt
-    photo_dates = [get_photo_date(path) for path in image_paths]
-    first_photo_date = min(photo_dates)
+    # Déterminer la date de référence pour le calcul
+    if ref_image:
+        # Si une image de référence est fournie, utiliser sa date
+        if not os.path.isfile(ref_image):
+            raise FileNotFoundError(f"Image de référence non trouvée : {ref_image}")
+        reference_date = get_photo_date(ref_image)
+        log(f"Utilisation de l'image de référence : {os.path.basename(ref_image)}", log_callback)
+        log(f"Date de référence : {reference_date.strftime('%Y-%m-%d %H:%M:%S')}", log_callback)
+    else:
+        # Sinon, utiliser la date la plus tôt de toutes les photos
+        photo_dates = [get_photo_date(path) for path in image_paths]
+        reference_date = min(photo_dates)
+        log(f"Utilisation de la photo la plus vieille comme référence", log_callback)
+        log(f"Date de référence : {reference_date.strftime('%Y-%m-%d %H:%M:%S')}", log_callback)
+
+    # Calculer la date taken finale : date de référence - 30 secondes
+    from datetime import timedelta
+    first_photo_date = reference_date - timedelta(seconds=30)
+    log(f"Date taken du collage (référence - 30s) : {first_photo_date.strftime('%Y-%m-%d %H:%M:%S')}", log_callback)
 
     # Utiliser la date fournie ou celle de la photo
     if not date_str:
@@ -194,10 +211,10 @@ def generate_collage(image_paths, title=None, date_str=None, output_name=None, l
     canvas.save(output, "JPEG", quality=95)
     log(f"💾 Sauvegarde de l'image : {output}", log_callback)
 
-    # Ajouter EXIF avec 5 étoiles et heure fixée à 02:00:00
+    # Ajouter EXIF avec 5 étoiles et la date/heure calculée (référence - 30s)
     try:
-        # Parser la date et fixer l'heure à 02:00:00 (comme dans GenererTitreJour.py)
-        dt = datetime.strptime(date_str, "%Y-%m-%d").replace(hour=2, minute=0, second=0)
+        # Utiliser la date calculée (first_photo_date qui contient déjà référence - 30s)
+        dt = first_photo_date
         dt_str = dt.strftime("%Y:%m:%d %H:%M:%S")
 
         zeroth_ifd = {
