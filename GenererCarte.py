@@ -87,27 +87,26 @@ def adjust_text_position(city_x, city_y, xmin, xmax, ymin, ymax, ax, name, force
         bbox=dict(facecolor="white", alpha=0.3, edgecolor="none", pad=2)
     )
 
-def set_exif_date_piexif(output_file, reference_img):
+def set_exif_date_piexif(output_file, taken_date):
+    """Applique la date EXIF à partir d'une date donnée (datetime)"""
     try:
-        dt_orig = None
-        if os.path.exists(reference_img) and reference_img.lower().endswith((".jpg", ".jpeg")):
-            img = Image.open(reference_img)
-            exif_dict = piexif.load(img.info.get("exif", b""))
-            dt_bytes = exif_dict["Exif"].get(piexif.ExifIFD.DateTimeOriginal)
-            if dt_bytes:
-                dt_orig = datetime.datetime.strptime(dt_bytes.decode(), "%Y:%m:%d %H:%M:%S")
-        if dt_orig is None:
-            dt_orig = datetime.datetime.fromtimestamp(os.path.getctime(reference_img))
-        dt_new = dt_orig - datetime.timedelta(seconds=10)
+        if taken_date is None:
+            log("⚠ Aucune date fournie pour les métadonnées EXIF")
+            return
+
+        # Convertir taken_date en datetime naïf si nécessaire
+        if taken_date.tzinfo is not None:
+            taken_date = taken_date.replace(tzinfo=None)
+
         exif_dict_new = {"0th": {}, "Exif": {}, "GPS": {}, "Interop": {}, "1st": {}, "thumbnail": None}
-        dt_str = dt_new.strftime("%Y:%m:%d %H:%M:%S")
+        dt_str = taken_date.strftime("%Y:%m:%d %H:%M:%S")
         exif_dict_new["Exif"][piexif.ExifIFD.DateTimeOriginal] = dt_str.encode()
         exif_dict_new["0th"][piexif.ImageIFD.DateTime] = dt_str.encode()
         exif_dict_new["0th"][piexif.ImageIFD.Rating] = 5
         exif_bytes = piexif.dump(exif_dict_new)
         img_out = Image.open(output_file)
         img_out.save(output_file, "JPEG", exif=exif_bytes)
-        log("✅ Date taken appliquée avec piexif")
+        log(f"✅ Date taken appliquée : {dt_str}")
     except Exception as e:
         log(f"⚠ Impossible d'appliquer la date EXIF : {e}")
 
@@ -320,6 +319,9 @@ def parse_arguments():
     return parser.parse_args()
 
 def generate_map(gpx_file, start_time, end_time, city_list, output_filename, ref_image=None, marge=None, titre=None):
+    if ref_image:
+        log("⚠ Le paramètre ref_image n'est plus utilisé. La date EXIF sera basée sur start_time.")
+
     log("📖 Lecture du fichier GPX")
     with open(gpx_file, "r", encoding="utf-8") as f:
         gpx = gpxpy.parse(f)
@@ -454,8 +456,8 @@ def generate_map(gpx_file, start_time, end_time, city_list, output_filename, ref
     Image.open(buf).convert("RGB").save(output_file, "JPEG")
     log(f"✅ Fichier généré : {output_file}")
 
-    if ref_image and os.path.exists(ref_image):
-        set_exif_date_piexif(output_file, ref_image)
+    if start_time:
+        set_exif_date_piexif(output_file, start_time)
 
 if __name__ == "__main__":
     args = parse_arguments()
