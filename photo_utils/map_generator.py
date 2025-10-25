@@ -103,19 +103,31 @@ def adjust_text_position(city_x, city_y, xmin, xmax, ymin, ymax, ax, name, force
     )
 
 
-def set_exif_date_piexif(output_file, reference_img, log_callback=None):
-    """Applique la date EXIF à partir d'une image de référence"""
+def set_exif_date_piexif(output_file, reference_img, log_callback=None, start_time=None):
+    """Applique la date EXIF à partir d'une image de référence ou d'une date de départ"""
     try:
         dt_orig = None
-        if os.path.exists(reference_img) and reference_img.lower().endswith((".jpg", ".jpeg")):
+
+        # Essayer d'extraire la date depuis l'image de référence
+        if reference_img and os.path.exists(reference_img) and reference_img.lower().endswith((".jpg", ".jpeg")):
             img = Image.open(reference_img)
             exif_dict = piexif.load(img.info.get("exif", b""))
             dt_bytes = exif_dict["Exif"].get(piexif.ExifIFD.DateTimeOriginal)
             if dt_bytes:
                 dt_orig = datetime.datetime.strptime(dt_bytes.decode(), "%Y:%m:%d %H:%M:%S")
-        if dt_orig is None:
-            dt_orig = datetime.datetime.fromtimestamp(os.path.getctime(reference_img))
-        dt_new = dt_orig - datetime.timedelta(seconds=10)
+            if dt_orig is None:
+                dt_orig = datetime.datetime.fromtimestamp(os.path.getctime(reference_img))
+            dt_new = dt_orig - datetime.timedelta(seconds=10)
+            log("✅ Date extraite de l'image de référence", log_callback)
+        # Si pas d'image de référence mais start_time fourni, utiliser start_time
+        elif start_time is not None:
+            dt_new = start_time
+            log("✅ Utilisation de la date de départ du tracé", log_callback)
+        else:
+            log("⚠ Aucune source de date disponible", log_callback)
+            return
+
+        # Appliquer les métadonnées EXIF
         exif_dict_new = {"0th": {}, "Exif": {}, "GPS": {}, "Interop": {}, "1st": {}, "thumbnail": None}
         dt_str = dt_new.strftime("%Y:%m:%d %H:%M:%S")
         exif_dict_new["Exif"][piexif.ExifIFD.DateTimeOriginal] = dt_str.encode()
@@ -124,7 +136,7 @@ def set_exif_date_piexif(output_file, reference_img, log_callback=None):
         exif_bytes = piexif.dump(exif_dict_new)
         img_out = Image.open(output_file)
         img_out.save(output_file, "JPEG", exif=exif_bytes)
-        log("✅ Date taken appliquée avec piexif", log_callback)
+        log("✅ Date taken et rating (5★) appliqués avec piexif", log_callback)
     except Exception as e:
         log(f"⚠ Impossible d'appliquer la date EXIF : {e}", log_callback)
 
@@ -380,5 +392,5 @@ def generate_map(gpx_file, start_time, end_time, city_list, output_filename,
     Image.open(buf).convert("RGB").save(output_file, "JPEG")
     log(f"✅ Fichier généré : {output_file}", log_callback)
 
-    if ref_image and os.path.exists(ref_image):
-        set_exif_date_piexif(output_file, ref_image, log_callback)
+    # Appliquer les métadonnées EXIF (date taken et rating 5★)
+    set_exif_date_piexif(output_file, ref_image, log_callback, start_time)
