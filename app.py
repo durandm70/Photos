@@ -11,9 +11,7 @@ from zoneinfo import ZoneInfo
 import threading
 
 # Import des modules locaux
-from config_manager import ConfigManager
-from map_generator import generate_map, parse_ville
-from collage_generator import generate_collage
+from photo_utils import ConfigManager, generate_map, parse_ville, generate_collage
 
 
 class PhotosApp:
@@ -190,8 +188,17 @@ class PhotosApp:
         ttk.Entry(collage_frame, textvariable=self.collage_title_var).grid(
             row=row, column=1, sticky=(tk.W, tk.E), padx=(5, 5), columnspan=2)
 
-        # Nom de sortie
+        # Date
         row += 1
+        ttk.Label(collage_frame, text="Date (YYYY-MM-DD) :").grid(row=row, column=0, sticky=tk.W, pady=2)
+        self.collage_date_var = tk.StringVar()
+        ttk.Entry(collage_frame, textvariable=self.collage_date_var).grid(
+            row=row, column=1, sticky=(tk.W, tk.E), padx=(5, 5), columnspan=2)
+        ttk.Label(collage_frame, text="(optionnel, date de la photo la plus ancienne si vide)",
+                  font=('TkDefaultFont', 8)).grid(row=row+1, column=1, sticky=tk.W, padx=(5, 0))
+
+        # Nom de sortie
+        row += 2
         ttk.Label(collage_frame, text="Nom de sortie :").grid(row=row, column=0, sticky=tk.W, pady=2)
         self.collage_output_var = tk.StringVar()
         ttk.Entry(collage_frame, textvariable=self.collage_output_var).grid(
@@ -427,6 +434,7 @@ class PhotosApp:
 
             # Récupérer les paramètres
             title = self.collage_title_var.get() or None
+            date_str = self.collage_date_var.get() or None
             output_name = self.collage_output_var.get() or None
 
             # Changer vers le dossier cible
@@ -438,6 +446,7 @@ class PhotosApp:
             output_file = generate_collage(
                 self.collage_images,
                 title=title,
+                date_str=date_str,
                 output_name=output_name,
                 log_callback=self._log_collage
             )

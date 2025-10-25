@@ -36,13 +36,14 @@ def get_photo_date(img_path):
     return datetime.fromtimestamp(os.path.getmtime(img_path))
 
 
-def generate_collage(image_paths, title=None, output_name=None, log_callback=None):
+def generate_collage(image_paths, title=None, date_str=None, output_name=None, log_callback=None):
     """
     Génère un collage à partir d'une liste d'images
 
     Args:
         image_paths: Liste des chemins des images
         title: Titre à afficher (optionnel)
+        date_str: Date à afficher au format YYYY-MM-DD (optionnel)
         output_name: Nom du fichier de sortie sans extension (optionnel)
         log_callback: Fonction de callback pour les logs (optionnel)
 
@@ -60,7 +61,10 @@ def generate_collage(image_paths, title=None, output_name=None, log_callback=Non
     # Récupérer la date la plus tôt
     photo_dates = [get_photo_date(path) for path in image_paths]
     first_photo_date = min(photo_dates)
-    date_str = first_photo_date.strftime("%Y-%m-%d")
+
+    # Utiliser la date fournie ou celle de la photo
+    if not date_str:
+        date_str = first_photo_date.strftime("%Y-%m-%d")
 
     # Déterminer le nom de fichier de sortie
     if output_name:
@@ -81,29 +85,31 @@ def generate_collage(image_paths, title=None, output_name=None, log_callback=Non
     canvas = Image.new("RGB", (W, H), background_color)
     draw = ImageDraw.Draw(canvas)
 
-    # Zone pour les photos
+    # Zone pour les photos avec titre et date
+    margin = 30
     if title:
         try:
             font_title = ImageFont.truetype("arial.ttf", 120)
+            font_date = ImageFont.truetype("arial.ttf", 80)
         except:
             font_title = ImageFont.load_default()
+            font_date = ImageFont.load_default()
 
-        margin = 30
-        header_height = 200
+        header_height = 250
         draw.text((margin, margin), title, font=font_title, fill="white")
+        draw.text((margin, margin + 140), date_str, font=font_date, fill="white")
         photo_area = (margin, header_height, W - margin, H - margin)
     else:
-        margin = 30
         photo_area = (margin, margin, W - margin, H - margin)
 
     x_min, y_min, x_max, y_max = photo_area
 
-    # Layouts adaptatifs
+    # Layouts adaptatifs (comme dans GenererTitreJour.py)
     num_photos = len(image_paths)
 
     if num_photos == 2:
-        positions = [(0.2, 0), (1, 0)]
-        grid_cols, grid_rows = 2, 1.5
+        positions = [(0, 0), (1, 0)]
+        grid_cols, grid_rows = 2, 1
     elif num_photos == 3:
         positions = [(0, 0), (1, 0), (0.5, 1)]
         grid_cols, grid_rows = 2, 2
@@ -114,15 +120,11 @@ def generate_collage(image_paths, title=None, output_name=None, log_callback=Non
         positions = [(0, 0), (1, 0), (2, 0), (0.5, 1), (1.5, 1)]
         grid_cols, grid_rows = 3, 2
     elif num_photos == 6:
-        positions = [(0, 0), (1, 0), (2, 0), (0, 1), (1, 1), (2, 1)]
+        positions = [(0, 0), (0, 1), (1, 0), (1, 1), (2, 0), (2, 1)]
         grid_cols, grid_rows = 3, 2
     else:  # 7 photos
-        positions = [(0, 0), (1, 0), (2, 0), (0, 1), (1, 1), (2, 1), (1, 2)]
+        positions = [(0, 0.5), (0, 2), (1, 0.5), (1, 2), (2, 0), (2, 1), (2, 2)]
         grid_cols, grid_rows = 3, 3
-
-    # Redimensionner positions si nécessaire
-    if num_photos < len(positions):
-        positions = positions[:num_photos]
 
     # Calculer les dimensions des cellules
     cell_w = (x_max - x_min) / grid_cols
@@ -153,8 +155,10 @@ def generate_collage(image_paths, title=None, output_name=None, log_callback=Non
 
         img = img.convert("RGBA")
 
-        # Redimensionner
-        max_w, max_h = int(cell_w * 0.95), int(cell_h * 0.95)
+        # Redimensionner avec size_factor de 1.3 (comme dans GenererTitreJour.py)
+        size_factor = 1.3
+        max_w = int((x_max - x_min) / 3 * size_factor)
+        max_h = int((y_max - y_min) / 3 * size_factor)
         img.thumbnail((max_w, max_h), Image.Resampling.LANCZOS)
 
         # Bordure blanche
@@ -169,20 +173,20 @@ def generate_collage(image_paths, title=None, output_name=None, log_callback=Non
         angle = random.randint(-15, 15)
         rotated = bordered.rotate(angle, expand=True, resample=Image.Resampling.BICUBIC)
 
-        # Position avec désalignement
+        # Position avec désalignement (comme dans GenererTitreJour.py)
         cx, cy = shuffled_positions[idx]
-        center_x = x_min + cx * cell_w + cell_w / 2 + random.uniform(-cell_w * 0.4, cell_w * 0.4)
-        center_y = y_min + cy * cell_h + cell_h / 2 + random.uniform(-cell_h * 0.4, cell_h * 0.4)
+        # Variation horizontale et verticale (aléa de 15%)
+        alea = 0.15
+        center_x = x_min + cx * cell_w + cell_w / 2 + random.uniform(-cell_w * alea, cell_w * alea)
+        center_y = y_min + cy * cell_h + cell_h / 2 + random.uniform(-cell_h * alea, cell_h * alea)
 
-        offset_x = random.randint(-40, 40)
-        offset_y = random.randint(-40, 40)
+        # Décalage aléatoire supplémentaire
+        alea2 = 40
+        offset_x = random.randint(-alea2, alea2)
+        offset_y = random.randint(-alea2, alea2)
 
         x = int(center_x - rotated.width / 2 + offset_x)
         y = int(center_y - rotated.height / 2 + offset_y)
-
-        # Limiter aux frontières
-        x = max(x_min, min(x, x_max - rotated.width))
-        y = max(y_min, min(y, y_max - rotated.height))
 
         canvas.paste(rotated, (x, y), rotated)
 
@@ -190,11 +194,14 @@ def generate_collage(image_paths, title=None, output_name=None, log_callback=Non
     canvas.save(output, "JPEG", quality=95)
     log(f"💾 Sauvegarde de l'image : {output}", log_callback)
 
-    # Ajouter EXIF avec 5 étoiles
+    # Ajouter EXIF avec 5 étoiles et heure fixée à 02:00:00
     try:
-        dt_str = first_photo_date.strftime("%Y:%m:%d %H:%M:%S")
+        # Parser la date et fixer l'heure à 02:00:00 (comme dans GenererTitreJour.py)
+        dt = datetime.strptime(date_str, "%Y-%m-%d").replace(hour=2, minute=0, second=0)
+        dt_str = dt.strftime("%Y:%m:%d %H:%M:%S")
+
         zeroth_ifd = {
-            piexif.ImageIFD.Software: "Collage Generator",
+            piexif.ImageIFD.Software: "Python Collage Script",
             piexif.ImageIFD.DateTime: dt_str,
             piexif.ImageIFD.Rating: 5
         }
