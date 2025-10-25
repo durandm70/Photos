@@ -313,7 +313,7 @@ def generate_map(gpx_file, start_time, end_time, city_list, output_filename,
     gdf_line = gpd.GeoDataFrame(geometry=[line], crs="EPSG:4326")
     gdf_line_proj = gdf_line.to_crs(epsg=3857)
 
-    width_px, height_px = 12 * 300, 9 * 300
+    width_px, height_px = 15 * 300, 12 * 300
     temp_buffered = gdf_line_proj.buffer(1000)
     xmin_temp, ymin_temp, xmax_temp, ymax_temp = temp_buffered.total_bounds
     zoom = calculate_zoom_for_extent(xmin_temp, ymin_temp, xmax_temp, ymax_temp, width_px, height_px)
@@ -350,7 +350,7 @@ def generate_map(gpx_file, start_time, end_time, city_list, output_filename,
                 log(f"⚠ Ville '{ville}' en dehors du périmètre, ignorée", log_callback)
 
     xmin, ymin, xmax, ymax = buffered.total_bounds
-    fig, ax = plt.subplots(figsize=(12, 9))
+    fig, ax = plt.subplots(figsize=(15, 12))
 
     draw_arrows(ax, gdf_line_proj.geometry[0], 1000 / (2 ** (zoom - 12)))
 

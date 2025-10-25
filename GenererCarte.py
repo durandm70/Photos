@@ -363,7 +363,7 @@ def generate_map(gpx_file, start_time, end_time, city_list, output_filename, ref
     xmin_deg, ymin_deg, xmax_deg, ymax_deg = gdf_line.total_bounds
 
     # Calcul du zoom avec une marge provisoire pour déterminer le zoom final
-    width_px, height_px = 12 * 300, 9 * 300
+    width_px, height_px = 15 * 300, 12 * 300
     temp_buffered = gdf_line_proj.buffer(1000)
     xmin_temp, ymin_temp, xmax_temp, ymax_temp = temp_buffered.total_bounds
     zoom = calculate_zoom_for_extent(xmin_temp, ymin_temp, xmax_temp, ymax_temp, width_px, height_px)
@@ -406,9 +406,9 @@ def generate_map(gpx_file, start_time, end_time, city_list, output_filename, ref
                 log(f"⚠ Ville '{ville}' en dehors du périmètre de la piste (avec marge {buffer_size:.0f}m), ignorée")
 
     xmin, ymin, xmax, ymax = buffered.total_bounds
-    fig, ax = plt.subplots(figsize=(12, 9))
+    fig, ax = plt.subplots(figsize=(15, 12))
 
-    width_px, height_px = 12 * 300, 9 * 300
+    width_px, height_px = 15 * 300, 12 * 300
     
     draw_arrows(ax, gdf_line_proj.geometry[0], 1000 / (2 ** (zoom - 12)))
 
