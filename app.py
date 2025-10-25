@@ -97,6 +97,9 @@ class PhotosApp:
         # Fichier de configuration actuel
         self.current_file: Optional[str] = None
 
+        # Suivi des modifications
+        self.modified: bool = False
+
         # Restaurer la géométrie de la fenêtre
         geometry = self.config_manager.get("window_geometry", "1200x800")
         self.root.geometry(geometry)
@@ -135,9 +138,6 @@ class PhotosApp:
         main_frame = ttk.Frame(self.root)
         main_frame.pack(fill=tk.BOTH, expand=True)
 
-        # Section dossier cible (en haut)
-        self._create_target_folder_section(main_frame)
-
         # PanedWindow horizontal pour séparer gauche/droite
         self.main_paned = ttk.PanedWindow(main_frame, orient=tk.HORIZONTAL)
         self.main_paned.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
@@ -151,21 +151,6 @@ class PhotosApp:
         # Ajouter les panels au PanedWindow
         self.main_paned.add(self.left_frame, weight=1)
         self.main_paned.add(self.right_frame, weight=2)
-
-    def _create_target_folder_section(self, parent):
-        """Crée la section de sélection du dossier cible"""
-        folder_frame = ttk.LabelFrame(parent, text="Dossier cible", padding="10")
-        folder_frame.pack(fill=tk.X, padx=5, pady=5)
-
-        ttk.Label(folder_frame, text="Dossier :").pack(side=tk.LEFT)
-
-        self.target_folder_var = tk.StringVar()
-        folder_entry = ttk.Entry(folder_frame, textvariable=self.target_folder_var)
-        folder_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
-
-        browse_btn = ttk.Button(folder_frame, text="...", width=5,
-                                command=self._browse_target_folder)
-        browse_btn.pack(side=tk.LEFT)
 
     def _create_left_panel(self):
         """Crée le panneau de gauche avec liste et contrôles"""
@@ -186,11 +171,13 @@ class PhotosApp:
         list_container = ttk.Frame(top_frame)
         list_container.pack(fill=tk.BOTH, expand=True)
 
-        # Créer un Treeview pour afficher les configurations avec icônes
+        # Créer un Treeview pour afficher les configurations
         self.actions_tree = ttk.Treeview(list_container, columns=('name',),
-                                         show='tree', selectmode='browse')
+                                         show='tree headings', selectmode='browse')
         self.actions_tree.heading('#0', text='Type')
-        self.actions_tree.column('#0', width=100)
+        self.actions_tree.heading('name', text='Nom')
+        self.actions_tree.column('#0', width=80)
+        self.actions_tree.column('name', width=200)
 
         scrollbar = ttk.Scrollbar(list_container, orient=tk.VERTICAL,
                                   command=self.actions_tree.yview)
@@ -202,16 +189,22 @@ class PhotosApp:
         # Bind selection
         self.actions_tree.bind('<<TreeviewSelect>>', self._on_action_select)
 
-        # Boutons d'action
-        buttons_frame = ttk.Frame(top_frame)
-        buttons_frame.pack(fill=tk.X, pady=(10, 0))
+        # Boutons d'action - ligne 1
+        buttons_frame1 = ttk.Frame(top_frame)
+        buttons_frame1.pack(fill=tk.X, pady=(10, 2))
 
-        ttk.Button(buttons_frame, text="Ajouter",
-                   command=self._add_action).pack(fill=tk.X, pady=2)
-        ttk.Button(buttons_frame, text="Supprimer",
-                   command=self._delete_action).pack(fill=tk.X, pady=2)
-        ttk.Button(buttons_frame, text="Générer l'image",
-                   command=self._generate_image).pack(fill=tk.X, pady=2)
+        ttk.Button(buttons_frame1, text="Ajouter",
+                   command=self._add_action).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 2))
+        ttk.Button(buttons_frame1, text="Supprimer",
+                   command=self._delete_action).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=2)
+        ttk.Button(buttons_frame1, text="Haut",
+                   command=self._move_action_up).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=2)
+        ttk.Button(buttons_frame1, text="Bas",
+                   command=self._move_action_down).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(2, 0))
+
+        # Bouton génération - ligne 2
+        ttk.Button(top_frame, text="Générer l'image",
+                   command=self._generate_image).pack(fill=tk.X, pady=(0, 0))
 
         # Zone inférieure : logs
         log_frame = ttk.Frame(left_paned)
@@ -406,6 +399,7 @@ class PhotosApp:
             self.actions = []
             self.current_action = None
             self.current_file = None
+            self.modified = False
             self._refresh_actions_list()
             self._show_detail_panel(None)
             self._log("Nouveau fichier créé")
@@ -425,13 +419,16 @@ class PhotosApp:
                 with open(filename, 'r', encoding='utf-8') as f:
                     data = json.load(f)
 
+                # Vérifier et convertir la version si nécessaire
+                version = data.get('version', 1)
+                if version != 2:
+                    self._log(f"Conversion du fichier de version {version} vers version 2")
+                    # Ici on pourrait faire des conversions si nécessaire
+
                 # Charger les configurations
                 self.actions = [ActionConfig.from_dict(item) for item in data.get('actions', [])]
                 self.current_file = filename
-
-                # Charger le dossier cible s'il existe
-                if 'target_folder' in data:
-                    self.target_folder_var.set(data['target_folder'])
+                self.modified = False
 
                 self._refresh_actions_list()
                 self._log(f"Fichier chargé : {filename}")
@@ -465,13 +462,14 @@ class PhotosApp:
 
         try:
             data = {
-                'target_folder': self.target_folder_var.get(),
+                'version': 2,
                 'actions': [action.to_dict() for action in self.actions]
             }
 
             with open(filename, 'w', encoding='utf-8') as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
 
+            self.modified = False
             self._log(f"Fichier sauvegardé : {filename}")
 
         except Exception as e:
@@ -479,8 +477,15 @@ class PhotosApp:
 
     def _check_unsaved_changes(self) -> bool:
         """Vérifie s'il y a des changements non sauvegardés"""
-        # Pour l'instant, on retourne toujours True
-        # TODO: implémenter la détection des changements
+        if self.modified:
+            response = messagebox.askyesnocancel(
+                "Modifications non sauvegardées",
+                "Voulez-vous sauvegarder les modifications ?"
+            )
+            if response is None:  # Cancel
+                return False
+            elif response:  # Yes
+                self._save_file()
         return True
 
     # ========== Gestion de la liste d'actions ==========
@@ -493,18 +498,18 @@ class PhotosApp:
 
         # Ajouter les actions
         for action in self.actions:
-            icon = self._get_action_icon(action.action_type)
-            self.actions_tree.insert('', 'end', text=f"{icon} {action.name}",
+            type_label = self._get_action_type_label(action.action_type)
+            self.actions_tree.insert('', 'end', text=type_label,
                                     values=(action.name,), tags=(action.action_type,))
 
-    def _get_action_icon(self, action_type: str) -> str:
-        """Retourne une icône pour le type d'action"""
-        icons = {
-            'carte': '🗺️',
-            'collage': '🖼️',
-            'titreJour': '📅'
+    def _get_action_type_label(self, action_type: str) -> str:
+        """Retourne le label pour le type d'action"""
+        labels = {
+            'carte': 'Carte',
+            'collage': 'Collage',
+            'titreJour': 'Titre jour'
         }
-        return icons.get(action_type, '❓')
+        return labels.get(action_type, 'Inconnu')
 
     def _add_action(self):
         """Ajoute une nouvelle action"""
@@ -539,9 +544,16 @@ class PhotosApp:
                 messagebox.showerror("Erreur", "Veuillez saisir un nom", parent=dialog)
                 return
 
+            # Vérifier qu'il n'y a pas déjà une action avec ce nom
+            for action in self.actions:
+                if action.name == name:
+                    messagebox.showerror("Erreur", f"Une configuration avec le nom '{name}' existe déjà", parent=dialog)
+                    return
+
             # Créer la nouvelle action
             action = ActionConfig(type_var.get(), name)
             self.actions.append(action)
+            self.modified = True
             self._refresh_actions_list()
             dialog.destroy()
 
@@ -584,9 +596,56 @@ class PhotosApp:
 
         # Supprimer l'action
         del self.actions[index]
+        self.modified = True
         self._refresh_actions_list()
         self.current_action = None
         self._show_detail_panel(None)
+
+    def _move_action_up(self):
+        """Déplace l'action sélectionnée vers le haut"""
+        selection = self.actions_tree.selection()
+        if not selection:
+            messagebox.showwarning("Attention", "Veuillez sélectionner une action à déplacer")
+            return
+
+        # Récupérer l'index de l'action
+        item = selection[0]
+        index = self.actions_tree.index(item)
+
+        if index == 0:
+            return  # Déjà en haut
+
+        # Échanger avec l'élément précédent
+        self.actions[index], self.actions[index - 1] = self.actions[index - 1], self.actions[index]
+        self.modified = True
+        self._refresh_actions_list()
+
+        # Resélectionner l'élément
+        items = self.actions_tree.get_children()
+        self.actions_tree.selection_set(items[index - 1])
+
+    def _move_action_down(self):
+        """Déplace l'action sélectionnée vers le bas"""
+        selection = self.actions_tree.selection()
+        if not selection:
+            messagebox.showwarning("Attention", "Veuillez sélectionner une action à déplacer")
+            return
+
+        # Récupérer l'index de l'action
+        item = selection[0]
+        index = self.actions_tree.index(item)
+
+        if index == len(self.actions) - 1:
+            return  # Déjà en bas
+
+        # Échanger avec l'élément suivant
+        self.actions[index], self.actions[index + 1] = self.actions[index + 1], self.actions[index]
+        self.modified = True
+        self._refresh_actions_list()
+
+        # Resélectionner l'élément
+        items = self.actions_tree.get_children()
+        self.actions_tree.selection_set(items[index + 1])
 
     def _on_action_select(self, event):
         """Appelé quand une action est sélectionnée"""
@@ -617,7 +676,8 @@ class PhotosApp:
             return
 
         # Mettre à jour le titre
-        self.detail_title.config(text=f"{self._get_action_icon(action.action_type)} {action.name}")
+        type_label = self._get_action_type_label(action.action_type)
+        self.detail_title.config(text=f"{type_label} - {action.name}")
 
         # Afficher le bon frame et charger les données
         if action.action_type == 'carte':
@@ -634,6 +694,8 @@ class PhotosApp:
         """Sauvegarde les paramètres de l'action actuelle"""
         if self.current_action is None:
             return
+
+        self.modified = True
 
         if self.current_action.action_type == 'carte':
             self.current_action.params = {
@@ -702,9 +764,10 @@ class PhotosApp:
 
     def _add_collage_images(self):
         """Ajoute des images au collage"""
+        initial_dir = os.path.dirname(self.current_file) if self.current_file else os.getcwd()
         filenames = filedialog.askopenfilenames(
             title="Sélectionner les images",
-            initialdir=self.target_folder_var.get(),
+            initialdir=initial_dir,
             filetypes=[("Images", "*.jpg *.jpeg *.png"), ("Tous les fichiers", "*.*")]
         )
 
@@ -720,9 +783,10 @@ class PhotosApp:
 
     def _add_titre_jour_images(self):
         """Ajoute des images au titre du jour"""
+        initial_dir = os.path.dirname(self.current_file) if self.current_file else os.getcwd()
         filenames = filedialog.askopenfilenames(
             title="Sélectionner les images",
-            initialdir=self.target_folder_var.get(),
+            initialdir=initial_dir,
             filetypes=[("Images", "*.jpg *.jpeg *.png"), ("Tous les fichiers", "*.*")]
         )
 
@@ -738,21 +802,12 @@ class PhotosApp:
 
     # ========== Parcourir les fichiers ==========
 
-    def _browse_target_folder(self):
-        """Ouvre un dialogue pour sélectionner le dossier cible"""
-        folder = filedialog.askdirectory(
-            title="Sélectionner le dossier cible",
-            initialdir=self.target_folder_var.get()
-        )
-        if folder:
-            self.target_folder_var.set(folder)
-            self.config_manager.set_target_folder(folder)
-
     def _browse_gpx_file(self):
         """Ouvre un dialogue pour sélectionner le fichier GPX"""
+        initial_dir = os.path.dirname(self.current_file) if self.current_file else os.getcwd()
         filename = filedialog.askopenfilename(
             title="Sélectionner le fichier GPX",
-            initialdir=self.target_folder_var.get(),
+            initialdir=initial_dir,
             filetypes=[("Fichiers GPX", "*.gpx"), ("Tous les fichiers", "*.*")]
         )
         if filename:
@@ -760,9 +815,10 @@ class PhotosApp:
 
     def _browse_ref_image(self):
         """Ouvre un dialogue pour sélectionner l'image de référence"""
+        initial_dir = os.path.dirname(self.current_file) if self.current_file else os.getcwd()
         filename = filedialog.askopenfilename(
             title="Sélectionner l'image de référence",
-            initialdir=self.target_folder_var.get(),
+            initialdir=initial_dir,
             filetypes=[("Images", "*.jpg *.jpeg *.png"), ("Tous les fichiers", "*.*")]
         )
         if filename:
@@ -774,6 +830,11 @@ class PhotosApp:
         """Génère l'image pour l'action sélectionnée"""
         if self.current_action is None:
             messagebox.showwarning("Attention", "Veuillez sélectionner une action")
+            return
+
+        # Vérifier que le fichier est sauvegardé
+        if not self.current_file:
+            messagebox.showerror("Erreur", "Veuillez d'abord sauvegarder le fichier de configuration")
             return
 
         # Sauvegarder les paramètres actuels
@@ -863,8 +924,8 @@ class PhotosApp:
                     self._log(f"⚠ Erreur de format de date : {e}")
                     raise
 
-            # Changer vers le dossier cible
-            target_folder = self.target_folder_var.get()
+            # Changer vers le dossier du fichier JSON
+            target_folder = os.path.dirname(self.current_file)
             if target_folder:
                 os.chdir(target_folder)
 
@@ -910,8 +971,8 @@ class PhotosApp:
             date_str = params.get('date') or None
             images = params.get('images', [])
 
-            # Changer vers le dossier cible
-            target_folder = self.target_folder_var.get()
+            # Changer vers le dossier du fichier JSON
+            target_folder = os.path.dirname(self.current_file)
             if target_folder:
                 os.chdir(target_folder)
 
@@ -971,8 +1032,8 @@ class PhotosApp:
             except ValueError:
                 raise ValueError("Le format de date doit être YYYY-MM-DD")
 
-            # Changer vers le dossier cible
-            target_folder = self.target_folder_var.get()
+            # Changer vers le dossier du fichier JSON
+            target_folder = os.path.dirname(self.current_file)
             if target_folder:
                 os.chdir(target_folder)
 
@@ -1007,12 +1068,13 @@ class PhotosApp:
 
     def _load_settings(self):
         """Charge les paramètres sauvegardés"""
-        self.target_folder_var.set(self.config_manager.get_target_folder())
+        pass  # Plus de paramètres à charger
 
     def _on_closing(self):
         """Gère la fermeture de l'application"""
-        # Sauvegarder la configuration actuelle
-        self._save_current_action()
+        # Vérifier les modifications non sauvegardées
+        if not self._check_unsaved_changes():
+            return
 
         # Sauvegarder la géométrie de la fenêtre
         self.config_manager.set("window_geometry", self.root.geometry())
