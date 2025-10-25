@@ -906,33 +906,79 @@ class PhotosApp:
         # Sauvegarder la configuration actuelle avant de dupliquer
         self._save_current_action()
 
-        # Générer un nouveau nom unique en ajoutant "_" jusqu'à ce qu'il n'y ait plus de conflit
-        new_name = action.name + "_"
-        existing_names = {a.name for a in self.actions}
+        # Créer une fenêtre de dialogue pour le nouveau nom
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Dupliquer l'action")
+        dialog.transient(self.root)
+        dialog.grab_set()
 
-        while new_name in existing_names:
-            new_name += "_"
+        # Configuration source
+        ttk.Label(dialog, text="Configuration source :").grid(row=0, column=0, sticky=tk.W, padx=10, pady=5)
+        ttk.Label(dialog, text=action.name, font=('TkDefaultFont', 10, 'bold')).grid(
+            row=0, column=1, sticky=tk.W, padx=10, pady=5)
 
-        # Créer une copie de l'action avec le nouveau nom
-        # On copie les paramètres en profondeur pour éviter les références partagées
-        new_action = ActionConfig(
-            action_type=action.action_type,
-            name=new_name,
-            params=copy.deepcopy(action.params),
-            dirty=True
-        )
+        # Nouveau nom
+        ttk.Label(dialog, text="Nouveau nom :").grid(row=1, column=0, sticky=tk.W, padx=10, pady=5)
+        name_var = tk.StringVar(value=action.name)
+        name_entry = ttk.Entry(dialog, textvariable=name_var, width=30)
+        name_entry.grid(row=1, column=1, sticky=(tk.W, tk.E), padx=10, pady=5)
+        name_entry.focus()
+        name_entry.select_range(0, tk.END)
 
-        # Ajouter la nouvelle action juste après l'action dupliquée
-        self.actions.insert(index + 1, new_action)
-        self.modified = True
-        self._refresh_actions_list()
+        # Boutons
+        btn_frame = ttk.Frame(dialog)
+        btn_frame.grid(row=2, column=0, columnspan=2, pady=10)
 
-        # Sélectionner la nouvelle action
-        items = self.actions_tree.get_children()
-        self.actions_tree.selection_set(items[index + 1])
-        self._on_action_select(None)
+        def on_ok():
+            new_name = name_var.get().strip()
+            if not new_name:
+                messagebox.showerror("Erreur", "Veuillez saisir un nom", parent=dialog)
+                return
 
-        self._log(f"Configuration '{action.name}' dupliquée sous le nom '{new_name}'")
+            # Vérifier qu'il n'y a pas déjà une action avec ce nom
+            for other_action in self.actions:
+                if other_action.name == new_name:
+                    messagebox.showerror("Erreur", f"Une configuration avec le nom '{new_name}' existe déjà", parent=dialog)
+                    return
+
+            # Créer une copie de l'action avec le nouveau nom
+            # On copie les paramètres en profondeur pour éviter les références partagées
+            new_action = ActionConfig(
+                action_type=action.action_type,
+                name=new_name,
+                params=copy.deepcopy(action.params),
+                dirty=True
+            )
+
+            # Ajouter la nouvelle action juste après l'action dupliquée
+            self.actions.insert(index + 1, new_action)
+            self.modified = True
+            self._refresh_actions_list()
+
+            # Sélectionner la nouvelle action
+            items = self.actions_tree.get_children()
+            self.actions_tree.selection_set(items[index + 1])
+            self._on_action_select(None)
+
+            self._log(f"Configuration '{action.name}' dupliquée sous le nom '{new_name}'")
+
+            dialog.destroy()
+
+        def on_cancel():
+            dialog.destroy()
+
+        ttk.Button(btn_frame, text="OK", command=on_ok).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame, text="Annuler", command=on_cancel).pack(side=tk.LEFT, padx=5)
+
+        # Enter pour valider
+        dialog.bind('<Return>', lambda e: on_ok())
+        dialog.bind('<Escape>', lambda e: on_cancel())
+
+        # Centrer la fenêtre
+        dialog.update_idletasks()
+        x = (dialog.winfo_screenwidth() // 2) - (dialog.winfo_width() // 2)
+        y = (dialog.winfo_screenheight() // 2) - (dialog.winfo_height() // 2)
+        dialog.geometry(f'+{x}+{y}')
 
     def _on_action_select(self, event):
         """Appelé quand une action est sélectionnée"""
